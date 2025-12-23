@@ -131,28 +131,6 @@ export function useSyncState(): UseSyncStateReturn {
     localStorage.setItem('rental_retiradas', JSON.stringify(retiradas));
   }, [retiradas]);
 
-  // Carrega do Sheets ao autenticar (com tratamento de erro)
-  useEffect(() => {
-    if (isAuthenticated) {
-      console.log('🔄 Tentando carregar dados do Google Sheets automaticamente...');
-      loadFromSheets()
-        .then((result) => {
-          if (result.success) {
-            console.log('✅ Carregamento automático concluído:', result.message);
-          } else {
-            console.warn('⚠️ Carregamento automático falhou:', result.message);
-            console.log('📦 Continuando com dados do localStorage...');
-          }
-        })
-        .catch((error) => {
-          console.error('❌ Erro ao carregar dados do Sheets (usando cache local):', error);
-          // Continua com dados do localStorage se falhar
-        });
-    } else {
-      console.log('⏸️ Autenticação não disponível, usando apenas dados locais');
-    }
-  }, [isAuthenticated, loadFromSheets]);
-
   const saveToLocalStorage = useCallback(() => {
     localStorage.setItem('rental_catalogo', JSON.stringify(catalogo));
     localStorage.setItem('rental_stock', JSON.stringify(stock));
@@ -235,6 +213,29 @@ export function useSyncState(): UseSyncStateReturn {
       return { success: false, message: errorMsg };
     }
   }, [isAuthenticated, loadAll]);
+
+  // Carrega do Sheets ao autenticar (com tratamento de erro)
+  // IMPORTANTE: Este useEffect deve vir DEPOIS da declaração de loadFromSheets
+  useEffect(() => {
+    if (isAuthenticated) {
+      console.log('🔄 Tentando carregar dados do Google Sheets automaticamente...');
+      loadFromSheets()
+        .then((result) => {
+          if (result.success) {
+            console.log('✅ Carregamento automático concluído:', result.message);
+          } else {
+            console.warn('⚠️ Carregamento automático falhou:', result.message);
+            console.log('📦 Continuando com dados do localStorage...');
+          }
+        })
+        .catch((error) => {
+          console.error('❌ Erro ao carregar dados do Sheets (usando cache local):', error);
+          // Continua com dados do localStorage se falhar
+        });
+    } else {
+      console.log('⏸️ Autenticação não disponível, usando apenas dados locais');
+    }
+  }, [isAuthenticated, loadFromSheets]);
 
   return {
     catalogo,

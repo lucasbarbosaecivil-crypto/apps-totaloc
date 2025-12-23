@@ -42,14 +42,28 @@ Se o GitHub bloquear o push por segurança:
 git push origin main --force
 ```
 
-## 📝 Sobre o Aviso do GitHub
+## 📝 Sobre o Bloqueio do GitHub
 
-O GitHub pode mostrar um aviso sobre o arquivo conter credenciais. Você tem duas opções:
+O GitHub **bloqueou o push** porque detectou credenciais no arquivo. Você precisa **permitir manualmente**.
 
-1. **Permitir manualmente**: Clique no link fornecido pelo GitHub para permitir
-2. **Ignorar o aviso**: O arquivo será commitado mesmo assim (não recomendado, mas funciona)
+### ✅ Solução: Permitir Manualmente no GitHub
 
-**Nota**: Se você permitir manualmente, o GitHub deixará passar apenas esta vez. Para commits futuros, você precisará permitir novamente ou usar push forçado.
+1. **Clique no link fornecido pelo GitHub**:
+   ```
+   https://github.com/lucasbarbosaecivil-crypto/apps-totaloc/security/secret-scanning/unblock-secret/37FAYSHkCpbuywRoN70Xs6ua0dh
+   ```
+
+2. **No site do GitHub**:
+   - Você verá uma página explicando que um secret foi detectado
+   - Clique em **"Allow this secret"** ou **"Permitir este secret"**
+   - Você precisará confirmar que entende os riscos
+
+3. **Depois de permitir, tente o push novamente**:
+   ```powershell
+   git push origin main
+   ```
+
+**Nota**: O GitHub permite apenas este commit específico. Se você fizer alterações futuras no arquivo, pode precisar permitir novamente.
 
 ## 🔍 Verificar se Funcionou
 
