@@ -23,9 +23,7 @@ let tokenExpiry: number = 0;
 let serviceAccountKey: ServiceAccountConfig | null = null;
 
 /**
- * Carrega as credenciais da Service Account
- * Tenta carregar de variável de ambiente primeiro (produção/Netlify)
- * Se não encontrar, carrega do arquivo JSON (desenvolvimento local)
+ * Carrega as credenciais da Service Account do arquivo JSON
  */
 async function loadServiceAccountKey(): Promise<ServiceAccountConfig> {
   if (serviceAccountKey) {
@@ -33,29 +31,14 @@ async function loadServiceAccountKey(): Promise<ServiceAccountConfig> {
   }
 
   try {
-    // Tenta carregar de variável de ambiente primeiro (Netlify/Produção)
-    // @ts-ignore - import.meta.env é definido pelo Vite
-    const envKey = import.meta.env.VITE_NETLIFY_CREDENTIALS_FILE;
-    if (envKey && envKey.trim() !== '') {
-      try {
-        console.log('📄 Carregando credenciais de variável de ambiente...');
-        serviceAccountKey = JSON.parse(envKey) as ServiceAccountConfig;
-        console.log('✅ Credenciais carregadas de variável de ambiente');
-        return serviceAccountKey;
-      } catch (parseError: any) {
-        console.error('❌ Erro ao fazer parse da variável de ambiente:', parseError);
-        // Continua para tentar carregar do arquivo
-      }
-    }
-
-    // Fallback: carrega do arquivo JSON (desenvolvimento local)
     console.log('📄 Tentando carregar arquivo de credenciais...');
+    // Carrega o arquivo JSON dinamicamente via fetch (evita problemas com Vite)
     const response = await fetch('/locadora-482015-14c6cb061046.json');
     if (!response.ok) {
       const errorMsg = `Erro ${response.status} ao carregar credenciais: ${response.statusText}`;
       console.error('❌', errorMsg);
       if (response.status === 404) {
-        throw new Error('Arquivo de credenciais não encontrado (404). Verifique se o arquivo está em public/locadora-482015-14c6cb061046.json ou configure a variável VITE_NETLIFY_CREDENTIALS_FILE no Netlify.');
+        throw new Error('Arquivo de credenciais não encontrado (404). Verifique se o arquivo está em public/locadora-482015-14c6cb061046.json');
       }
       throw new Error(errorMsg);
     }
@@ -67,7 +50,7 @@ async function loadServiceAccountKey(): Promise<ServiceAccountConfig> {
     console.error('❌ Erro ao carregar Service Account Key:', error);
     // Mensagem mais específica baseada no tipo de erro
     if (error.message?.includes('404') || error.message?.includes('Failed to fetch')) {
-      throw new Error(`Arquivo de credenciais não encontrado. Verifique se o arquivo locadora-482015-14c6cb061046.json está na pasta public/ e foi incluído no deploy, ou configure a variável VITE_NETLIFY_CREDENTIALS_FILE no Netlify.`);
+      throw new Error(`Arquivo de credenciais não encontrado. Verifique se o arquivo locadora-482015-14c6cb061046.json está na pasta public/ e foi incluído no deploy.`);
     }
     throw new Error(`Não foi possível carregar credenciais: ${error.message}`);
   }

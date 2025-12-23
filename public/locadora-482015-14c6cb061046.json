@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "locadora-482015",
+  "private_key_id": "14c6cb061046b0d45a0cbcde17912a3a6fda1648",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCt/LqlG6t+wClN\nRHbsSl+d+kKumeTZM59R95ErOrMGglgsit1nKY1JFIYgA/spiO0gBU5mADqVQEh3\nze/lI2l7PxU+l0Wc0QQEHPHZNEDKqkwuIFzLuvs488CIL20T5UQA15g+Lhpf4sLk\nFiOZDeZemZixlT/KUhQXEk9CbTPZAmOGl6vlsxnd5xdC9bzxHxjS/ZwD81CsbBYK\nOElbOjqVtOX19FtrME+kh9hSYRQUmIlrTPvRrpbe/jxOcoBXPx/68VHH2WAfu2/+\nflLLgG5vDkk9Yiy+2sdtXzPhSSwl1KEXjyb3As1yU7DilR0mB8KhUSJEvZn4dkcJ\nPv3sc36bAgMBAAECggEAB8+WO6+zaXT02hW4aFKHLAahSHeSZuxrdS0gc0i+QAzs\nKqJM9kLakDLLUTyiVfKoGGp2BdZDVqlxl2xmTLCeTAhX4f/U6sOKV1fWxSe3YmHT\njsuox4+VCGtUooK100W91f7AijuLQtlKNGPlsCJwtM8/u0fB1+x/ZU4gZeKsE8DS\n2fWTbB9AKbQsLQMU9gcSPn2wStOPdsYg6ohpXqGKh5xp1+gpF0105HNQtp2TBxmQ\nXgahMITmGz22Gd3OcvwjOHp/XeMtqZQwS2jsaD/svbjbU4EUz6AIh13l7FkAqHym\npHGQhWexlLuIS4NJBR+Vw9CL/Cx94p//n7/VAx78gQKBgQDnj8QvgQBKaQzdjw5X\naOugCziFt1L58rm1+AC2lJy3cX2w03OaZHWXpQqJD6DlFLTHhuvnwzHyC5tpmJrJ\nB8a5TxTR5OHQ52q54eZKw2D+LU63UFxfMNg8wbpxLNlUc2dDQk41tV2afHkHoBNd\nHM+0m7nKdwsSlKb11E65Q/KGUQKBgQDAWXFYPTtwa+aXYYOvaPgvrq9kmGrLVmXt\nmmAc34wq3DtB69ANW3YbJnvQ8ZWsrbtuVay8G6ArMGRiG7tWzXUj22zS0DxyjSvQ\ncIYjlUWjBb8JLXg/1y7rWf2m4zsrUZbsJlxipjXh7LVMu3jIAWIC57YtiG1n6+t4\nlskQKdk/KwKBgHZJpIg3t7RLMX1EhKj2OddJpBf6a/KuoVtpUsPx6pRy7ygS/CzU\nQJW0g0s8po4fI7IBJCUCO1NPxpYMlJU42bTzxsjpyMj0TjqiQQfUAooVDu7pqCYg\nR3XR6LHDnUlcolVjW5xoB2bRSuowRXP9McUq/5+DbC6TrS5Kw+Qz54HhAoGAbZnJ\ngu0JFGr3LqTq4yVd3dWcrSZIG+r0E2pWf71FYhqxTUOv/hxydM/91zYBAi7QUPNS\nhLD9F/7wBBMnMTPLHo5mOM1c1CzqnU+wr0/cKSMaEoGtNjtHyeUyKkjqKynHZHIL\nTE7G/x/gwoNENDrNfThIzzMgnAmK1+CbWrFtz5cCgYBgzhd4e/4/Z1WAYtljwDqj\nwDLQcnM0IWzD5UjWOfEVYHeieUUni45naNVDZRUz5XU+M+4Js2e1gFT+O6TCRkSA\nVZjDogtnzB25rhQJoKbMAEXqolKWm8Odd2tR+efJvOTK60HY8CO6TgF5S8XRGrzv\nR6uy0K22PoBF1hRa5aHYrg==\n-----END PRIVATE KEY-----\n",
+  "client_email": "locadora-equip@locadora-482015.iam.gserviceaccount.com",
+  "client_id": "110996953560357676981",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/locadora-equip%40locadora-482015.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}

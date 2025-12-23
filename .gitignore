@@ -18,8 +18,8 @@ dist-ssr
 !package-lock.json
 !tsconfig.json
 !public/*.json
-# Excluir especificamente o arquivo de credenciais da Service Account
-public/locadora-482015-14c6cb061046.json
+# O arquivo em public/ precisa ser commitado para funcionar no Netlify (plano gratuito)
+# Está em public/ então será acessível publicamente de qualquer forma
 
 # Editor directories and files
 .vscode/*
