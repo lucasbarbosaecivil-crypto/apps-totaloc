@@ -1,0 +1,16 @@
+/* Estilos básicos globais para TOTAL LOC
+ * Este arquivo existe principalmente para evitar o warning de MIME (index.css servindo como HTML)
+ * e para permitir futuros ajustes de estilo globais, se necessário.
+ */
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background-color: #f8fafc;
+}
+
+
