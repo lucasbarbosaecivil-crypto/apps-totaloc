@@ -13,7 +13,9 @@ export default defineConfig(({ mode }) => {
       define: {
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
         'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'import.meta.env.VITE_GOOGLE_CLIENT_ID': JSON.stringify(env.VITE_GOOGLE_CLIENT_ID || '')
+        'import.meta.env.VITE_GOOGLE_CLIENT_ID': JSON.stringify(env.VITE_GOOGLE_CLIENT_ID || ''),
+        // Variável de ambiente para credenciais da Service Account (Netlify)
+        'import.meta.env.VITE_NETLIFY_CREDENTIALS_FILE': JSON.stringify(env.VITE_NETLIFY_CREDENTIALS_FILE || env.NETLIFY_CREDENTIALS_FILE || ''),
       },
       resolve: {
         alias: {
