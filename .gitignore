@@ -18,6 +18,8 @@ dist-ssr
 !package-lock.json
 !tsconfig.json
 !public/*.json
+# Excluir especificamente o arquivo de credenciais da Service Account
+public/locadora-482015-14c6cb061046.json
 
 # Editor directories and files
 .vscode/*
