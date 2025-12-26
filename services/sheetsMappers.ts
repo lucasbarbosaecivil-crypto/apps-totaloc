@@ -41,20 +41,48 @@ export function equipamentoToRow(model: EquipmentModel): any[] {
 }
 
 export function rowToEquipamento(row: any[], headers: string[]): EquipmentModel {
+  // Função helper que busca coluna de forma case-insensitive e ignora espaços
   const getCol = (colName: string) => {
-    const idx = headers.indexOf(colName);
-    return idx >= 0 ? (row[idx] || '') : '';
+    // Primeiro tenta match exato
+    let idx = headers.indexOf(colName);
+    if (idx >= 0) {
+      return row[idx] !== undefined && row[idx] !== null ? String(row[idx]).trim() : '';
+    }
+    
+    // Se não encontrou, tenta case-insensitive
+    idx = headers.findIndex(h => 
+      h && (h.toString().trim().toLowerCase() === colName.toLowerCase() ||
+           h.toString().trim() === colName)
+    );
+    if (idx >= 0) {
+      return row[idx] !== undefined && row[idx] !== null ? String(row[idx]).trim() : '';
+    }
+    
+    return '';
   };
 
   // Tenta encontrar Valor_Diaria ou Valor_Unitario (compatibilidade)
-  const valor = parseFloat(getCol('Valor_Diaria')) || parseFloat(getCol('Valor_Unitario')) || 0;
-  const quantidade = getCol('Quantidade') ? parseFloat(getCol('Quantidade')) : undefined;
+  const valorStr = getCol('Valor_Diaria') || getCol('Valor_Unitario') || '0';
+  const valor = parseFloat(valorStr.replace(',', '.')) || 0;
+  
+  const quantidadeStr = getCol('Quantidade');
+  const quantidade = quantidadeStr ? parseFloat(quantidadeStr.replace(',', '.')) : undefined;
+  
   const unidadeStr = getCol('Unidade') || 'Diária';
-  const unidade = unidadeStr === 'Mês' ? RentalUnit.MES : RentalUnit.DIARIA;
+  const unidade = unidadeStr.toLowerCase().includes('mês') || unidadeStr.toLowerCase().includes('mes') 
+    ? RentalUnit.MES 
+    : RentalUnit.DIARIA;
+
+  const id = getCol('ID_Equipamento');
+  const nome = getCol('Nome');
+  
+  if (!id || !nome) {
+    throw new Error(`Linha inválida: ID ou Nome está vazio. ID: "${id}", Nome: "${nome}"`);
+  }
 
   return {
-    id: getCol('ID_Equipamento') || '',
-    nome: getCol('Nome') || '',
+    id: id,
+    nome: nome,
     descricao: getCol('Descricao') || '',
     valorUnitario: valor,
     unidade: unidade,

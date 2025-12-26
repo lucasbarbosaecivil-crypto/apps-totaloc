@@ -92,9 +92,14 @@ export async function signJWT(
       dataBuffer
     );
 
-    // Converte assinatura para base64url
+    // Converte assinatura para base64url (método mais robusto)
     const signatureArray = new Uint8Array(signature);
-    const signatureBase64 = btoa(String.fromCharCode(...signatureArray));
+    // Usa método mais robusto para converter ArrayBuffer para base64
+    let binaryString = '';
+    for (let i = 0; i < signatureArray.length; i++) {
+      binaryString += String.fromCharCode(signatureArray[i]);
+    }
+    const signatureBase64 = btoa(binaryString);
     const encodedSignature = signatureBase64
       .replace(/\+/g, '-')
       .replace(/\//g, '_')
@@ -103,7 +108,10 @@ export async function signJWT(
     // Retorna JWT completo
     return `${data}.${encodedSignature}`;
   } catch (error: any) {
-    console.error('Erro ao assinar JWT:', error);
+    console.error('❌ Erro detalhado ao assinar JWT:', error);
+    console.error('   Tipo:', error.name);
+    console.error('   Mensagem:', error.message);
+    console.error('   Stack:', error.stack);
     throw new Error(`Falha ao assinar JWT: ${error.message}`);
   }
 }

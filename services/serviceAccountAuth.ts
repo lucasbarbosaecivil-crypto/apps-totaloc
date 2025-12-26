@@ -102,7 +102,24 @@ export async function authenticateWithServiceAccount(): Promise<string> {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(`Falha ao obter access token: ${error.error || response.statusText}`);
+      const errorDetails = error.error || error;
+      const errorMessage = typeof errorDetails === 'string' 
+        ? errorDetails 
+        : (errorDetails?.message || errorDetails?.error || JSON.stringify(errorDetails));
+      
+      console.error('❌ Erro detalhado do Google:', error);
+      console.error('   Status:', response.status);
+      console.error('   Erro:', errorMessage);
+      
+      // Mensagens mais específicas para erros comuns
+      if (errorMessage.includes('invalid_grant')) {
+        throw new Error(`Erro de autenticação (invalid_grant). Verifique se:
+- A chave privada no arquivo JSON está correta
+- O relógio do sistema está sincronizado
+- As credenciais não expiraram`);
+      }
+      
+      throw new Error(`Falha ao obter access token: ${errorMessage}`);
     }
 
     const tokenData = await response.json();

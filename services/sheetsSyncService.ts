@@ -109,46 +109,79 @@ export class SheetsSyncService {
   async loadEquipamentos(): Promise<EquipmentModel[]> {
     if (!this.config) throw new Error('Serviço não configurado');
 
-    try {
-      console.log('📥 Carregando equipamentos da aba EQUIPAMENTOS...');
-      const rows = await readSheetData(this.config, { sheetName: 'EQUIPAMENTOS' });
-      console.log(`📊 Linhas lidas: ${rows?.length || 0}`);
-      
-      if (!rows || rows.length === 0) {
-        console.log('⚠️ Planilha EQUIPAMENTOS está vazia ou não possui dados');
-        return [];
-      }
-
-      const headers = rows[0];
-      console.log('📋 Cabeçalhos encontrados:', headers);
-      
-      const dataRows = rows.slice(1);
-      console.log(`📦 Linhas de dados: ${dataRows.length}`);
-      
-      const equipamentos = dataRows.map((row, index) => {
-        try {
-          return rowToEquipamento(row, headers);
-        } catch (err: any) {
-          console.error(`❌ Erro ao converter linha ${index + 2}:`, err, 'Linha:', row);
-          return null;
+    // Tenta diferentes variações do nome da aba (case-insensitive)
+    const possibleSheetNames = ['EQUIPAMENTOS', 'Equipamentos', 'equipamentos', 'EQUIPAMENTOS ', ' Equipamentos'];
+    
+    for (const sheetName of possibleSheetNames) {
+      try {
+        console.log(`📥 Tentando carregar equipamentos da aba "${sheetName}"...`);
+        const rows = await readSheetData(this.config, { sheetName: sheetName.trim() });
+        console.log(`📊 Linhas lidas: ${rows?.length || 0}`);
+        
+        if (!rows || rows.length === 0) {
+          console.log(`⚠️ Aba "${sheetName}" está vazia, tentando próximo nome...`);
+          continue;
         }
-      }).filter((eq): eq is EquipmentModel => eq !== null);
-      
-      console.log(`✅ ${equipamentos.length} equipamentos carregados com sucesso`);
-      return equipamentos;
-    } catch (error: any) {
-      console.error('❌ Erro ao carregar equipamentos:', error);
-      console.error('   Mensagem:', error.message);
-      console.error('   Stack:', error.stack);
-      
-      if (error.message?.includes('Unable to parse range') || 
-          error.message?.includes('not found')) {
-        // Planilha vazia ou não encontrada, retorna array vazio
-        console.log('⚠️ Planilha vazia ou não encontrada, retornando array vazio');
-        return [];
+
+        const headers = rows[0];
+        console.log('📋 Cabeçalhos encontrados:', headers);
+        
+        // Verifica se encontrou pelo menos um cabeçalho esperado
+        const expectedHeaders = ['ID_Equipamento', 'Nome', 'Valor_Diaria'];
+        const hasExpectedHeader = expectedHeaders.some(expected => 
+          headers.some(h => h && (h.toString().trim() === expected || h.toString().trim().toLowerCase() === expected.toLowerCase()))
+        );
+        
+        if (!hasExpectedHeader) {
+          console.log(`⚠️ Cabeçalhos não correspondem ao esperado na aba "${sheetName}", tentando próximo...`);
+          continue;
+        }
+        
+        const dataRows = rows.slice(1);
+        console.log(`📦 Linhas de dados: ${dataRows.length}`);
+        
+        if (dataRows.length === 0) {
+          console.log(`⚠️ Nenhuma linha de dados encontrada na aba "${sheetName}"`);
+          return [];
+        }
+        
+        const equipamentos = dataRows.map((row, index) => {
+          try {
+            const equipamento = rowToEquipamento(row, headers);
+            // Validação básica: deve ter ID e Nome
+            if (!equipamento.id || !equipamento.nome) {
+              console.warn(`⚠️ Linha ${index + 2} ignorada: falta ID ou Nome`, row);
+              return null;
+            }
+            return equipamento;
+          } catch (err: any) {
+            console.error(`❌ Erro ao converter linha ${index + 2}:`, err.message, 'Linha:', row);
+            return null;
+          }
+        }).filter((eq): eq is EquipmentModel => eq !== null);
+        
+        console.log(`✅ ${equipamentos.length} equipamentos carregados com sucesso da aba "${sheetName}"`);
+        return equipamentos;
+      } catch (error: any) {
+        // Se for erro de "não encontrado", tenta próximo nome
+        if (error.message?.includes('Unable to parse range') || 
+            error.message?.includes('not found') ||
+            error.message?.includes('400')) {
+          console.log(`⚠️ Aba "${sheetName}" não encontrada, tentando próximo nome...`);
+          continue;
+        }
+        // Se for outro erro, loga e tenta próximo
+        console.error(`❌ Erro ao carregar da aba "${sheetName}":`, error.message);
+        continue;
       }
-      throw error;
     }
+    
+    // Se chegou aqui, nenhuma variação funcionou
+    console.error('❌ Não foi possível carregar equipamentos de nenhuma aba. Verifique:');
+    console.error('   1. Se a aba existe na planilha');
+    console.error('   2. Se o nome da aba está correto (pode ser "EQUIPAMENTOS", "Equipamentos", etc.)');
+    console.error('   3. Se há dados na aba');
+    return [];
   }
 
   async saveEquipamentos(data: EquipmentModel[]): Promise<void> {
