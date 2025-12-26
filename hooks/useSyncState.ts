@@ -7,7 +7,7 @@ import {
   ServiceOrder,
   Retirada,
 } from '../types';
-import { RentalUnit, OSStatus } from '../types';
+// RentalUnit e OSStatus não são mais usados aqui (foram removidos os dados padrão)
 
 interface UseSyncStateReturn {
   // Estado
@@ -37,7 +37,8 @@ interface UseSyncStateReturn {
 }
 
 /**
- * Hook que gerencia estado sincronizado entre localStorage e Google Sheets
+ * Hook que gerencia estado sincronizado - Google Sheets é a fonte de verdade
+ * localStorage é usado apenas como cache temporário após carregar do Sheets
  */
 export function useSyncState(): UseSyncStateReturn {
   const {
@@ -49,87 +50,67 @@ export function useSyncState(): UseSyncStateReturn {
     loadAll,
   } = useSheetsSync();
 
-  // Estado local (mantém compatibilidade com código existente)
+  // Estado local - inicia vazio, dados vêm exclusivamente do Google Sheets
   const [catalogo, setCatalogo] = useState<EquipmentModel[]>(() => {
-    const saved = localStorage.getItem('rental_catalogo');
-    return saved ? JSON.parse(saved) : [
-      { id: 'M1', nome: 'Escavadeira Caterpillar 320', descricao: 'Hidráulica', valorUnitario: 1200, unidade: RentalUnit.DIARIA },
-      { id: 'M2', nome: 'Gerador Stemac 100kVA', descricao: 'Silencioso', valorUnitario: 4500, unidade: RentalUnit.MES }
-    ];
+    // Não carrega do localStorage na inicialização - dados devem vir do Google Sheets
+    return [];
   });
 
   const [stock, setStock] = useState<StockItem[]>(() => {
-    const saved = localStorage.getItem('rental_stock');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      // Se o localStorage tem um array vazio, usa dados padrão
-      if (Array.isArray(parsed) && parsed.length === 0) {
-        console.log('⚠️ localStorage tem stock vazio, usando dados padrão');
-        const defaultStock = [
-          { id: 'SN-CAT-001', modelId: 'M1', foto: 'https://images.unsplash.com/photo-1578319439584-104c94d37305?w=400' },
-          { id: 'SN-CAT-002', modelId: 'M1', foto: 'https://images.unsplash.com/photo-1578319439584-104c94d37305?w=400' },
-          { id: 'SN-GEN-99', modelId: 'M2', foto: 'https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=400' }
-        ];
-        localStorage.setItem('rental_stock', JSON.stringify(defaultStock));
-        return defaultStock;
-      }
-      return parsed;
-    }
-    // Dados padrão apenas se não houver nada salvo
-    const defaultStock = [
-      { id: 'SN-CAT-001', modelId: 'M1', foto: 'https://images.unsplash.com/photo-1578319439584-104c94d37305?w=400' },
-      { id: 'SN-CAT-002', modelId: 'M1', foto: 'https://images.unsplash.com/photo-1578319439584-104c94d37305?w=400' },
-      { id: 'SN-GEN-99', modelId: 'M2', foto: 'https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=400' }
-    ];
-    localStorage.setItem('rental_stock', JSON.stringify(defaultStock));
-    return defaultStock;
+    // Stock é calculado dinamicamente baseado em equipamentos e locações
+    // Não carrega do localStorage - sempre inicia vazio
+    return [];
   });
 
   const [clients, setClients] = useState<Client[]>(() => {
-    const saved = localStorage.getItem('rental_clients');
-    return saved ? JSON.parse(saved) : [
-      { 
-        id: 'c1', 
-        nome: 'Construtora Horizonte', 
-        email: 'obra1@horizonte.com.br', 
-        telefone: '(11) 98765-4321', 
-        rua: 'Rua das Obras',
-        numero: '450',
-        cidade: 'Presidente Olegário-MG'
-      }
-    ];
+    // Não carrega do localStorage na inicialização - dados devem vir do Google Sheets
+    return [];
   });
 
   const [orders, setOrders] = useState<ServiceOrder[]>(() => {
-    const saved = localStorage.getItem('rental_orders');
-    return saved ? JSON.parse(saved) : [];
+    // Não carrega do localStorage na inicialização - dados devem vir do Google Sheets
+    return [];
   });
 
   const [retiradas, setRetiradas] = useState<Retirada[]>(() => {
-    const saved = localStorage.getItem('rental_retiradas');
-    return saved ? JSON.parse(saved) : [];
+    // Não carrega do localStorage na inicialização - dados devem vir do Google Sheets
+    return [];
   });
 
-  // Sincroniza com localStorage sempre que houver mudança
+  // localStorage usado apenas como cache temporário - Google Sheets é a fonte de verdade
+  // Sincroniza com localStorage apenas se já estiver autenticado e houver dados do Sheets
   useEffect(() => {
-    localStorage.setItem('rental_catalogo', JSON.stringify(catalogo));
-  }, [catalogo]);
+    // Só salva no localStorage se tiver dados do Google Sheets (evita sobrescrever com arrays vazios antes do carregamento)
+    if (isAuthenticated && catalogo.length > 0) {
+      localStorage.setItem('rental_catalogo', JSON.stringify(catalogo));
+    }
+  }, [catalogo, isAuthenticated]);
 
   useEffect(() => {
-    localStorage.setItem('rental_stock', JSON.stringify(stock));
-  }, [stock]);
+    // Stock não precisa ser salvo no localStorage (é calculado dinamicamente)
+    // Mas podemos salvar como cache se necessário
+    if (isAuthenticated && stock.length > 0) {
+      localStorage.setItem('rental_stock', JSON.stringify(stock));
+    }
+  }, [stock, isAuthenticated]);
 
   useEffect(() => {
-    localStorage.setItem('rental_clients', JSON.stringify(clients));
-  }, [clients]);
+    if (isAuthenticated && clients.length > 0) {
+      localStorage.setItem('rental_clients', JSON.stringify(clients));
+    }
+  }, [clients, isAuthenticated]);
 
   useEffect(() => {
-    localStorage.setItem('rental_orders', JSON.stringify(orders));
-  }, [orders]);
+    if (isAuthenticated && orders.length > 0) {
+      localStorage.setItem('rental_orders', JSON.stringify(orders));
+    }
+  }, [orders, isAuthenticated]);
 
   useEffect(() => {
-    localStorage.setItem('rental_retiradas', JSON.stringify(retiradas));
-  }, [retiradas]);
+    if (isAuthenticated && retiradas.length > 0) {
+      localStorage.setItem('rental_retiradas', JSON.stringify(retiradas));
+    }
+  }, [retiradas, isAuthenticated]);
 
   const saveToLocalStorage = useCallback(() => {
     localStorage.setItem('rental_catalogo', JSON.stringify(catalogo));
@@ -140,17 +121,9 @@ export function useSyncState(): UseSyncStateReturn {
   }, [catalogo, stock, clients, orders, retiradas]);
 
   const loadFromLocalStorage = useCallback(() => {
-    const savedCatalogo = localStorage.getItem('rental_catalogo');
-    const savedStock = localStorage.getItem('rental_stock');
-    const savedClients = localStorage.getItem('rental_clients');
-    const savedOrders = localStorage.getItem('rental_orders');
-    const savedRetiradas = localStorage.getItem('rental_retiradas');
-
-    if (savedCatalogo) setCatalogo(JSON.parse(savedCatalogo));
-    if (savedStock) setStock(JSON.parse(savedStock));
-    if (savedClients) setClients(JSON.parse(savedClients));
-    if (savedOrders) setOrders(JSON.parse(savedOrders));
-    if (savedRetiradas) setRetiradas(JSON.parse(savedRetiradas));
+    // Não carrega mais do localStorage - Google Sheets é a única fonte de dados
+    // Esta função é mantida apenas para compatibilidade, mas não faz nada
+    console.log('⚠️ loadFromLocalStorage não é mais usado - use loadFromSheets()');
   }, []);
 
   const syncToSheets = useCallback(async () => {
@@ -178,24 +151,20 @@ export function useSyncState(): UseSyncStateReturn {
       console.log('🔄 Iniciando carregamento dos dados do Google Sheets...');
       const data = await loadAll();
       if (data) {
-        // Google Sheets é a fonte de verdade - sobrescreve sempre
+        // Google Sheets é a fonte de verdade - sempre sobrescreve, mesmo se vazio
         setCatalogo(data.catalogo || []);
         setClients(data.clients || []);
         setOrders(data.orders || []);
-        if (data.retiradas) {
-          setRetiradas(data.retiradas);
-        } else {
-          setRetiradas([]);
-        }
+        setRetiradas(data.retiradas || []);
         
-        // Stock é calculado virtualmente - só atualiza se houver dados no Sheets
-        // Caso contrário, mantém os dados locais (que são calculados baseado em equipamentos e locações)
+        // Stock: se houver dados no Sheets, carrega; senão, mantém vazio (será calculado dinamicamente)
         if (data.stock && data.stock.length > 0) {
           console.log(`✅ Carregando ${data.stock.length} itens do stock do Sheets`);
           setStock(data.stock);
         } else {
-          // Stock vazio no Sheets - mantém cálculo virtual local
-          console.log('⚠️ Stock vazio no Sheets, mantendo cálculo virtual local');
+          // Stock vazio no Sheets - mantém vazio (será calculado dinamicamente baseado em equipamentos e locações)
+          console.log('ℹ️ Stock vazio no Sheets, será calculado dinamicamente');
+          setStock([]);
         }
         
         const totalItems = data.catalogo.length + data.clients.length + data.orders.length + (data.retiradas?.length || 0);
@@ -225,15 +194,15 @@ export function useSyncState(): UseSyncStateReturn {
             console.log('✅ Carregamento automático concluído:', result.message);
           } else {
             console.warn('⚠️ Carregamento automático falhou:', result.message);
-            console.log('📦 Continuando com dados do localStorage...');
+            console.log('📦 App iniciará sem dados - conecte-se ao Google Sheets para carregar');
           }
         })
         .catch((error) => {
-          console.error('❌ Erro ao carregar dados do Sheets (usando cache local):', error);
-          // Continua com dados do localStorage se falhar
+          console.error('❌ Erro ao carregar dados do Sheets:', error);
+          console.log('📦 App iniciará sem dados - conecte-se ao Google Sheets para carregar');
         });
     } else {
-      console.log('⏸️ Autenticação não disponível, usando apenas dados locais');
+      console.log('⏸️ Autenticação não disponível - conecte-se ao Google Sheets para carregar dados');
     }
   }, [isAuthenticated, loadFromSheets]);
 
