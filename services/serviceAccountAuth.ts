@@ -71,7 +71,17 @@ export async function authenticateWithServiceAccount(): Promise<string> {
     const credentials = await loadServiceAccountKey();
 
     // Gera JWT assinado
-    const { signJWT } = await import('./jwtSigner');
+    // Tenta usar jose primeiro (mais confiável), fallback para implementação manual
+    let signJWT;
+    try {
+      const joseModule = await import('./jwtSignerJose');
+      signJWT = joseModule.signJWT;
+      console.log('✅ Usando biblioteca jose para assinar JWT');
+    } catch (error) {
+      console.log('⚠️ jose não disponível, usando implementação manual');
+      const manualModule = await import('./jwtSigner');
+      signJWT = manualModule.signJWT;
+    }
     
     const now = Math.floor(Date.now() / 1000);
     const expiry = now + 3600; // 1 hora
