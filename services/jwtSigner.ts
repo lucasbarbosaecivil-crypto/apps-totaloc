@@ -45,12 +45,31 @@ async function importPrivateKey(pemKey: string): Promise<CryptoKey> {
 
 /**
  * Codifica objeto para base64url
+ * Usa encodeURIComponent para tratar caracteres Unicode corretamente
  */
 function base64urlEncode(str: string): string {
-  return btoa(str)
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=/g, '');
+  try {
+    // Primeiro converte para UTF-8 bytes
+    const utf8Bytes = new TextEncoder().encode(str);
+    
+    // Converte bytes para string binária
+    let binaryString = '';
+    for (let i = 0; i < utf8Bytes.length; i++) {
+      binaryString += String.fromCharCode(utf8Bytes[i]);
+    }
+    
+    // Converte para base64
+    const base64 = btoa(binaryString);
+    
+    // Converte para base64url
+    return base64
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '');
+  } catch (error) {
+    console.error('Erro ao codificar base64url:', error);
+    throw error;
+  }
 }
 
 /**
