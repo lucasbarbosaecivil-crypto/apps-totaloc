@@ -11,6 +11,8 @@ node_modules
 dist
 dist-ssr
 *.local
+# Permitir commit do .env.local (necessário para Netlify)
+!.env.local
 
 # Service Account Keys (credenciais sensíveis)
 *-*.json
