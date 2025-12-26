@@ -38,20 +38,39 @@ self.addEventListener('activate', (event) => {
 
 // Estratégia: Network First, fallback para Cache
 self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+  
+  // Ignora requisições que não podem ser cacheadas
+  if (url.protocol === 'chrome-extension:' || 
+      url.protocol === 'chrome:' ||
+      url.protocol === 'moz-extension:' ||
+      url.protocol === 'data:' ||
+      url.protocol === 'blob:' ||
+      !url.protocol.startsWith('http')) {
+    return; // Deixa passar sem cache
+  }
+  
   // Ignora requisições para APIs externas (Google Sheets, etc)
   if (event.request.url.includes('googleapis.com') || 
-      event.request.url.includes('google.com')) {
+      event.request.url.includes('google.com') ||
+      event.request.url.includes('accounts.google.com')) {
     return; // Deixa passar sem cache
   }
 
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        // Clona a resposta para cachear
-        const responseToCache = response.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseToCache);
-        });
+        // Só cacheia respostas válidas e do mesmo domínio
+        if (response && response.status === 200 && response.type === 'basic') {
+          // Clona a resposta para cachear
+          const responseToCache = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache).catch((err) => {
+              // Ignora erros de cache silenciosamente
+              console.warn('[SW] Cache put failed:', err);
+            });
+          });
+        }
         return response;
       })
       .catch(() => {

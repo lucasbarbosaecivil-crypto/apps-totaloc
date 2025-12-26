@@ -32,7 +32,6 @@ import {
   FileText,
   DollarSign,
   ArrowDownCircle,
-  Lock,
   LogOut,
   User as UserIcon,
   Menu,
@@ -53,7 +52,6 @@ import {
   Despesa,
   AgrupadorDespesa,
   Retirada,
-  User
 } from './types';
 import { askArchitect } from './services/geminiService';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from 'recharts';
@@ -65,23 +63,7 @@ import { SyncStatus } from './components/SyncStatus';
 import { ToastContainer, useToastContainer } from './components/ToastContainer';
 import { formatDocument, getMaxLength } from './utils/documentFormatter';
 
-// Usuários do sistema
-const SYSTEM_USERS: User[] = [
-  { id: '1', nome: 'Giovani', senha: 'totalloc2025' },
-  { id: '2', nome: 'Alzira', senha: 'totalloc2025' },
-  { id: '3', nome: 'Alberto', senha: 'totalloc2025' },
-  { id: '4', nome: 'Admin', senha: 'totalloc2025' }
-];
-
 const App: React.FC = () => {
-  // Estado de autenticação
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('rental_current_user');
-    return saved ? JSON.parse(saved) : null;
-  });
-  const [loginUsername, setLoginUsername] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
-  const [loginError, setLoginError] = useState('');
 
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -89,7 +71,7 @@ const App: React.FC = () => {
   // Filtro de período do Dashboard
   const [dashboardStartDate, setDashboardStartDate] = useState<string>('');
   const [dashboardEndDate, setDashboardEndDate] = useState<string>('');
-  const [isModalOpen, setIsModalOpen] = useState<'catalogo' | 'client' | 'os' | 'auth' | 'finish-os' | 'despesa' | 'retirada' | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState<'catalogo' | 'client' | 'os' | 'finish-os' | 'despesa' | 'retirada' | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingCatId, setEditingCatId] = useState<string | null>(null);
   const [editingCliId, setEditingCliId] = useState<string | null>(null);
@@ -104,12 +86,16 @@ const App: React.FC = () => {
   // --- Google Sheets Sync ---
   const {
     isAuthenticated,
+    accessToken,
     isSyncing,
     lastSync,
     syncError,
     spreadsheetId,
     authenticate,
+    disconnect,
     setSpreadsheetId,
+    loadAll, // <--- IMPORTANTE: Carregar dados usando o token
+    syncAll, // <--- IMPORTANTE: Salvar dados usando o token
   } = useSheetsSync();
 
   // --- Persistence Logic (agora com sincronização) ---
@@ -124,8 +110,7 @@ const App: React.FC = () => {
     setClients,
     setOrders,
     setRetiradas,
-    syncToSheets,
-    loadFromSheets,
+    // NÃO vamos mais usar syncToSheets ou loadFromSheets daqui
   } = useSyncState();
 
   // Estoque é calculado dinamicamente - não precisa de base separada
@@ -133,24 +118,27 @@ const App: React.FC = () => {
 
   // Auto-sync quando houver mudanças (com debounce melhorado)
   useEffect(() => {
-    if (!isAuthenticated) return;
+    // Só tenta sincronizar se estiver autenticado E tiver o token
+    if (!isAuthenticated || !accessToken) return;
     
-    let timeoutId: NodeJS.Timeout;
-    
-    // Debounce de 3 segundos para evitar muitas requisições
-    timeoutId = setTimeout(async () => {
+    const timeoutId = setTimeout(async () => {
       try {
-        await syncToSheets();
-        // Toast de sucesso apenas em sincronizações manuais
+        console.log("🔄 Salvando alterações automaticamente...");
+        // Passa todos os dados atuais para a função de sincronização
+        await syncAll({
+          catalogo,
+          stock,
+          clients,
+          orders,
+          retiradas
+        });
       } catch (err: any) {
-        console.error('Erro ao sincronizar (não crítico, usando cache local):', err);
-        // Não mostra toast de erro para sincronização automática
-        // Apenas para sincronização manual
+        console.error('Erro ao sincronizar (auto-save):', err);
       }
-    }, 3000);
+    }, 5000); // Aumentei para 5s para evitar muitas chamadas
 
     return () => clearTimeout(timeoutId);
-  }, [catalogo, stock, clients, orders, isAuthenticated, syncToSheets]);
+  }, [catalogo, stock, clients, orders, retiradas, isAuthenticated, accessToken, syncAll]);
 
   // --- Derived Logic ---
   const activeOrders = useMemo(() => orders.filter(os => os.status === OSStatus.ATIVO), [orders]);
@@ -1247,30 +1235,6 @@ const App: React.FC = () => {
     setIsModalOpen(null);
   };
 
-  // Função de login
-  const handleLogin = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    setLoginError('');
-
-    const user = SYSTEM_USERS.find(
-      u => u.nome.toLowerCase() === loginUsername.toLowerCase() && u.senha === loginPassword
-    );
-
-    if (user) {
-      setCurrentUser(user);
-      localStorage.setItem('rental_current_user', JSON.stringify(user));
-      setLoginUsername('');
-      setLoginPassword('');
-    } else {
-      setLoginError('Usuário ou senha incorretos');
-    }
-  };
-
-  // Função de logout
-  const handleLogout = () => {
-    setCurrentUser(null);
-    localStorage.removeItem('rental_current_user');
-  };
 
   // --- AI Logic ---
   const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'assistant'; text: string }[]>([]);
@@ -1288,66 +1252,77 @@ const App: React.FC = () => {
     setIsLoadingAI(false);
   };
 
-  // Se não estiver logado, mostrar tela de login
-  if (!currentUser) {
+  // Se não estiver autenticado com Google, mostrar tela de login
+  if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 flex items-center justify-center p-4">
-        <div className="bg-white rounded-[2.5rem] shadow-2xl p-8 md:p-12 w-full max-w-md">
+        <div className="w-full max-w-md">
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-20 h-20 bg-blue-600 rounded-2xl mb-4">
-              <Lock className="text-white" size={40} />
+            <div className="inline-flex items-center justify-center w-20 h-20 bg-white/20 backdrop-blur-sm rounded-2xl mb-4">
+              <Package className="text-white" size={40} />
             </div>
-            <h1 className="text-3xl font-black text-slate-800 mb-2">TOTAL LOC</h1>
-            <p className="text-slate-500 text-sm">Total Loc Aluguel de Equipamentos</p>
+            <h1 className="text-4xl font-black text-white mb-2">TOTAL LOC</h1>
+            <p className="text-blue-100 text-sm">Sistema de Gestão de Locação de Equipamentos</p>
           </div>
-
-          <form onSubmit={handleLogin} className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Usuário</label>
-              <select
-                className="w-full bg-slate-50 border border-slate-200 rounded-3xl px-6 h-16 text-sm font-bold focus:ring-4 focus:ring-blue-100 outline-none shadow-sm"
-                value={loginUsername}
-                onChange={e => {
-                  setLoginUsername(e.target.value);
-                  setLoginError('');
-                }}
-                required
-              >
-                <option value="">Selecione o usuário</option>
-                {SYSTEM_USERS.map(user => (
-                  <option key={user.id} value={user.nome}>{user.nome}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Senha</label>
-              <input
-                type="password"
-                className="w-full bg-slate-50 border border-slate-200 rounded-3xl px-6 h-16 text-sm font-bold focus:ring-4 focus:ring-blue-100 outline-none shadow-sm"
-                placeholder="Digite sua senha"
-                value={loginPassword}
-                onChange={e => {
-                  setLoginPassword(e.target.value);
-                  setLoginError('');
-                }}
-                required
-              />
-            </div>
-
-            {loginError && (
-              <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-center">
-                <p className="text-red-600 text-sm font-bold">{loginError}</p>
-              </div>
-            )}
-
-            <button
-              type="submit"
-              className="w-full bg-blue-600 text-white px-6 py-4 rounded-2xl font-black uppercase text-sm shadow-2xl shadow-blue-500/20 transition-all hover:bg-blue-700 active:scale-95"
-            >
-              Entrar
-            </button>
-          </form>
+          <GoogleAuth
+            isAuthenticated={isAuthenticated}
+            accessToken={accessToken}
+            spreadsheetId={spreadsheetId}
+            setSpreadsheetId={(id) => {
+              setSpreadsheetId(id);
+            }}
+            isSyncing={isSyncing}
+            syncError={syncError}
+            lastSync={lastSync}
+            onAuthenticate={(spreadsheetId, accessToken) => {
+              authenticate(spreadsheetId, accessToken);
+              toast.success('Conectado ao Google Sheets com sucesso!');
+            }}
+            onDisconnect={() => {
+              disconnect();
+              toast.success('Desconectado com sucesso!');
+            }}
+            onLoadFromSheets={async () => {
+              try {
+                // Usa a função loadAll do useSheetsSync (que tem o token)
+                const data = await loadAll();
+                
+                if (data) {
+                  // Atualiza os estados da tela com os dados que vieram da planilha
+                  setCatalogo(data.catalogo);
+                  setClients(data.clients);
+                  setOrders(data.orders);
+                  setRetiradas(data.retiradas);
+                  // Estoque é calculado dinamicamente, não precisa setar se não vier
+                  if(data.stock && data.stock.length > 0) setStock(data.stock);
+                  
+                  const totalItems = data.catalogo.length + data.clients.length + data.orders.length + (data.retiradas?.length || 0);
+                  const message = `Dados carregados com sucesso! (${totalItems} registros)`;
+                  toast.success(message);
+                  return { success: true, message };
+                }
+                const errorMsg = 'Nenhum dado retornado.';
+                toast.error(errorMsg);
+                return { success: false, message: errorMsg };
+              } catch (error: any) {
+                console.error('Erro ao carregar dados:', error);
+                const errorMsg = error.message || 'Erro ao carregar dados';
+                toast.error(errorMsg);
+                return { success: false, message: errorMsg };
+              }
+            }}
+            onSyncToSheets={async () => {
+              // Usa a função syncAll passando os dados atuais da tela
+              await syncAll({
+                catalogo,
+                stock,
+                clients,
+                orders,
+                retiradas
+              });
+              toast.success('Dados sincronizados com sucesso!');
+            }}
+          />
         </div>
         <ToastComponent />
       </div>
@@ -1385,9 +1360,12 @@ const App: React.FC = () => {
             <XIcon size={20} className="text-white" />
           </button>
           <button
-            onClick={handleLogout}
+            onClick={() => {
+              disconnect();
+              toast.success('Desconectado com sucesso!');
+            }}
             className="hidden md:block bg-white/10 backdrop-blur-sm hover:bg-white/20 rounded-2xl p-2 transition-all"
-            title="Sair"
+            title="Desconectar do Google"
           >
             <LogOut size={20} className="text-white" />
           </button>
@@ -1457,24 +1435,23 @@ const App: React.FC = () => {
               isAuthenticated={isAuthenticated}
               onSync={async () => {
                 try {
-                  await syncToSheets();
+                  await syncAll({
+                    catalogo,
+                    stock,
+                    clients,
+                    orders,
+                    retiradas
+                  });
                   toast.success('Dados sincronizados com sucesso!');
                 } catch (error: any) {
                   toast.error(`Erro ao sincronizar: ${error.message || 'Erro desconhecido'}`);
                 }
               }}
             />
-            <button
-              onClick={() => setIsModalOpen('auth')}
-              className="bg-slate-600 text-white px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-slate-700 transition-all active:scale-95"
-              title="Configurar planilha"
-            >
-              ⚙️
-            </button>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2 bg-blue-600 text-white rounded-2xl px-4 py-2 shadow-lg shadow-blue-500/30">
                 <UserIcon size={16} />
-                <span className="text-sm font-bold">{currentUser.nome}</span>
+                <span className="text-sm font-bold">Conectado</span>
               </div>
             </div>
           </div>
@@ -3106,34 +3083,6 @@ const App: React.FC = () => {
                 </>
               )}
 
-              {isModalOpen === 'auth' && (
-                <GoogleAuth
-                  isAuthenticated={isAuthenticated}
-                  spreadsheetId={spreadsheetId}
-                  setSpreadsheetId={(id) => {
-                    setSpreadsheetId(id);
-                    authenticate(id);
-                    toast.success('Configuração atualizada com sucesso!');
-                    setTimeout(() => setIsModalOpen(null), 1500);
-                  }}
-                  isSyncing={isSyncing}
-                  syncError={syncError}
-                  lastSync={lastSync}
-                  onLoadFromSheets={async () => {
-                    const result = await loadFromSheets();
-                    if (result.success) {
-                      toast.success(result.message || 'Dados carregados com sucesso!');
-                    } else {
-                      toast.error(result.message || 'Erro ao carregar dados do Google Sheets');
-                    }
-                    return result;
-                  }}
-                  onSyncToSheets={async () => {
-                    await syncToSheets();
-                    toast.success('Dados sincronizados com sucesso!');
-                  }}
-                />
-              )}
             </div>
           </div>
         </div>

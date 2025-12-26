@@ -1,6 +1,7 @@
 /**
  * Serviço de Sincronização com Google Sheets
  * Gerencia a sincronização bidirecional de dados
+ * Agora usa OAuth 2.0 (token do usuário) ao invés de Service Account
  */
 
 import {
@@ -11,13 +12,11 @@ import {
   Retirada,
 } from '../types';
 import {
-  SheetsConfig,
   readSheetData,
   writeSheetData,
   clearAndWriteSheet,
   ensureSheetExists,
 } from './googleSheetsService';
-import { authenticateWithServiceAccount, getServiceAccountConfig } from './serviceAccountAuth';
 import {
   // Equipamentos
   EQUIPAMENTOS_HEADERS,
@@ -49,38 +48,14 @@ export interface SyncStatus {
 
 /**
  * Classe principal de sincronização
+ * Agora requer accessToken e spreadsheetId em cada chamada (OAuth 2.0)
  */
 export class SheetsSyncService {
-  private config: SheetsConfig | null = null;
   private syncStatus: SyncStatus = {
     isSyncing: false,
     lastSync: null,
     error: null,
   };
-
-  /**
-   * Configura o serviço com credenciais
-   * Se não fornecido, usa Service Account
-   */
-  setConfig(config?: SheetsConfig) {
-    if (config) {
-      this.config = config;
-    } else {
-      // Usa Service Account por padrão
-      const saConfig = getServiceAccountConfig();
-      this.config = {
-        spreadsheetId: saConfig.spreadsheetId,
-        getAccessToken: saConfig.getAccessToken,
-      };
-    }
-  }
-
-  /**
-   * Verifica se está configurado
-   */
-  isConfigured(): boolean {
-    return this.config !== null;
-  }
 
   /**
    * Obtém status de sincronização
@@ -92,30 +67,26 @@ export class SheetsSyncService {
   /**
    * Garante que todas as planilhas necessárias existem
    */
-  async ensureSheetsExist(): Promise<void> {
-    if (!this.config) throw new Error('Serviço não configurado');
-
+  async ensureSheetsExist(accessToken: string, spreadsheetId: string): Promise<void> {
     await Promise.all([
-      ensureSheetExists(this.config, 'EQUIPAMENTOS'),
-      ensureSheetExists(this.config, 'CLIENTES'),
-      ensureSheetExists(this.config, 'ORDENS_SERVICO'),
-      ensureSheetExists(this.config, 'OS_ITENS'),
-      ensureSheetExists(this.config, 'RETIRADAS'),
+      ensureSheetExists(accessToken, spreadsheetId, 'EQUIPAMENTOS'),
+      ensureSheetExists(accessToken, spreadsheetId, 'CLIENTES'),
+      ensureSheetExists(accessToken, spreadsheetId, 'ORDENS_SERVICO'),
+      ensureSheetExists(accessToken, spreadsheetId, 'OS_ITENS'),
+      ensureSheetExists(accessToken, spreadsheetId, 'RETIRADAS'),
     ]);
   }
 
   // ==================== EQUIPAMENTOS ====================
 
-  async loadEquipamentos(): Promise<EquipmentModel[]> {
-    if (!this.config) throw new Error('Serviço não configurado');
-
+  async loadEquipamentos(accessToken: string, spreadsheetId: string): Promise<EquipmentModel[]> {
     // Tenta diferentes variações do nome da aba (case-insensitive)
     const possibleSheetNames = ['EQUIPAMENTOS', 'Equipamentos', 'equipamentos', 'EQUIPAMENTOS ', ' Equipamentos'];
     
     for (const sheetName of possibleSheetNames) {
       try {
         console.log(`📥 Tentando carregar equipamentos da aba "${sheetName}"...`);
-        const rows = await readSheetData(this.config, { sheetName: sheetName.trim() });
+        const rows = await readSheetData(accessToken, spreadsheetId, { sheetName: sheetName.trim() });
         console.log(`📊 Linhas lidas: ${rows?.length || 0}`);
         
         if (!rows || rows.length === 0) {
@@ -184,14 +155,12 @@ export class SheetsSyncService {
     return [];
   }
 
-  async saveEquipamentos(data: EquipmentModel[]): Promise<void> {
-    if (!this.config) throw new Error('Serviço não configurado');
-
+  async saveEquipamentos(accessToken: string, spreadsheetId: string, data: EquipmentModel[]): Promise<void> {
     this.syncStatus.isSyncing = true;
     try {
-      await ensureSheetExists(this.config, 'EQUIPAMENTOS');
+      await ensureSheetExists(accessToken, spreadsheetId, 'EQUIPAMENTOS');
       const rows = data.map(equipamentoToRow);
-      await clearAndWriteSheet(this.config, 'EQUIPAMENTOS', EQUIPAMENTOS_HEADERS, rows);
+      await clearAndWriteSheet(accessToken, spreadsheetId, 'EQUIPAMENTOS', EQUIPAMENTOS_HEADERS, rows);
       this.syncStatus.lastSync = new Date();
       this.syncStatus.error = null;
     } catch (error: any) {
@@ -202,14 +171,11 @@ export class SheetsSyncService {
     }
   }
 
-
   // ==================== CLIENTES ====================
 
-  async loadClientes(): Promise<Client[]> {
-    if (!this.config) throw new Error('Serviço não configurado');
-
+  async loadClientes(accessToken: string, spreadsheetId: string): Promise<Client[]> {
     try {
-      const rows = await readSheetData(this.config, { sheetName: 'CLIENTES' });
+      const rows = await readSheetData(accessToken, spreadsheetId, { sheetName: 'CLIENTES' });
       if (!rows || rows.length === 0) return [];
 
       const headers = rows[0];
@@ -222,14 +188,12 @@ export class SheetsSyncService {
     }
   }
 
-  async saveClientes(data: Client[]): Promise<void> {
-    if (!this.config) throw new Error('Serviço não configurado');
-
+  async saveClientes(accessToken: string, spreadsheetId: string, data: Client[]): Promise<void> {
     this.syncStatus.isSyncing = true;
     try {
-      await ensureSheetExists(this.config, 'CLIENTES');
+      await ensureSheetExists(accessToken, spreadsheetId, 'CLIENTES');
       const rows = data.map(clienteToRow);
-      await clearAndWriteSheet(this.config, 'CLIENTES', CLIENTES_HEADERS, rows);
+      await clearAndWriteSheet(accessToken, spreadsheetId, 'CLIENTES', CLIENTES_HEADERS, rows);
       this.syncStatus.lastSync = new Date();
       this.syncStatus.error = null;
     } catch (error: any) {
@@ -242,19 +206,17 @@ export class SheetsSyncService {
 
   // ==================== ORDENS DE SERVIÇO ====================
 
-  async loadOrdens(): Promise<ServiceOrder[]> {
-    if (!this.config) throw new Error('Serviço não configurado');
-
+  async loadOrdens(accessToken: string, spreadsheetId: string): Promise<ServiceOrder[]> {
     try {
       // Carrega ordens
-      const ordemRows = await readSheetData(this.config, { sheetName: 'ORDENS_SERVICO' });
+      const ordemRows = await readSheetData(accessToken, spreadsheetId, { sheetName: 'ORDENS_SERVICO' });
       if (!ordemRows || ordemRows.length === 0) return [];
 
       const ordemHeaders = ordemRows[0];
       const ordens = ordemRows.slice(1).map(row => rowToOrdem(row, ordemHeaders));
 
       // Carrega itens
-      const itemRows = await readSheetData(this.config, { sheetName: 'OS_ITENS' });
+      const itemRows = await readSheetData(accessToken, spreadsheetId, { sheetName: 'OS_ITENS' });
       if (itemRows && itemRows.length > 0) {
         const itemHeaders = itemRows[0];
         const items = itemRows.slice(1).map(row => rowToOSItem(row, itemHeaders));
@@ -276,17 +238,15 @@ export class SheetsSyncService {
     }
   }
 
-  async saveOrdens(data: ServiceOrder[]): Promise<void> {
-    if (!this.config) throw new Error('Serviço não configurado');
-
+  async saveOrdens(accessToken: string, spreadsheetId: string, data: ServiceOrder[]): Promise<void> {
     this.syncStatus.isSyncing = true;
     try {
-      await ensureSheetExists(this.config, 'ORDENS_SERVICO');
-      await ensureSheetExists(this.config, 'OS_ITENS');
+      await ensureSheetExists(accessToken, spreadsheetId, 'ORDENS_SERVICO');
+      await ensureSheetExists(accessToken, spreadsheetId, 'OS_ITENS');
 
       // Salva ordens
       const ordemRows = data.map(ordemToRow);
-      await clearAndWriteSheet(this.config, 'ORDENS_SERVICO', ORDENS_HEADERS, ordemRows);
+      await clearAndWriteSheet(accessToken, spreadsheetId, 'ORDENS_SERVICO', ORDENS_HEADERS, ordemRows);
 
       // Salva itens (normalizados)
       const itemRows: any[][] = [];
@@ -295,7 +255,7 @@ export class SheetsSyncService {
           itemRows.push(osItemToRow(os.id, item));
         });
       });
-      await clearAndWriteSheet(this.config, 'OS_ITENS', OS_ITENS_HEADERS, itemRows);
+      await clearAndWriteSheet(accessToken, spreadsheetId, 'OS_ITENS', OS_ITENS_HEADERS, itemRows);
 
       this.syncStatus.lastSync = new Date();
       this.syncStatus.error = null;
@@ -309,11 +269,9 @@ export class SheetsSyncService {
 
   // ==================== RETIRADAS ====================
 
-  async loadRetiradas(): Promise<Retirada[]> {
-    if (!this.config) throw new Error('Serviço não configurado');
-
+  async loadRetiradas(accessToken: string, spreadsheetId: string): Promise<Retirada[]> {
     try {
-      const rows = await readSheetData(this.config, { sheetName: 'RETIRADAS' });
+      const rows = await readSheetData(accessToken, spreadsheetId, { sheetName: 'RETIRADAS' });
       if (!rows || rows.length === 0) return [];
 
       const headers = rows[0];
@@ -327,14 +285,12 @@ export class SheetsSyncService {
     }
   }
 
-  async saveRetiradas(data: Retirada[]): Promise<void> {
-    if (!this.config) throw new Error('Serviço não configurado');
-
+  async saveRetiradas(accessToken: string, spreadsheetId: string, data: Retirada[]): Promise<void> {
     this.syncStatus.isSyncing = true;
     try {
-      await ensureSheetExists(this.config, 'RETIRADAS');
+      await ensureSheetExists(accessToken, spreadsheetId, 'RETIRADAS');
       const rows = data.map(retiradaToRow);
-      await clearAndWriteSheet(this.config, 'RETIRADAS', RETIRADAS_HEADERS, rows);
+      await clearAndWriteSheet(accessToken, spreadsheetId, 'RETIRADAS', RETIRADAS_HEADERS, rows);
       this.syncStatus.lastSync = new Date();
       this.syncStatus.error = null;
     } catch (error: any) {
@@ -347,24 +303,27 @@ export class SheetsSyncService {
 
   // ==================== SINCRONIZAÇÃO COMPLETA ====================
 
-  async syncAll(data: {
-    catalogo: EquipmentModel[];
-    stock: StockItem[];
-    clients: Client[];
-    orders: ServiceOrder[];
-    retiradas: Retirada[];
-  }): Promise<void> {
+  async syncAll(
+    accessToken: string,
+    spreadsheetId: string,
+    data: {
+      catalogo: EquipmentModel[];
+      stock: StockItem[];
+      clients: Client[];
+      orders: ServiceOrder[];
+      retiradas: Retirada[];
+    }
+  ): Promise<void> {
     await Promise.all([
-      this.saveEquipamentos(data.catalogo),
+      this.saveEquipamentos(accessToken, spreadsheetId, data.catalogo),
       // Estoque não é mais salvo - é calculado dinamicamente baseado em equipamentos e locações
-      // this.saveEstoque(data.stock),
-      this.saveClientes(data.clients),
-      this.saveOrdens(data.orders),
-      this.saveRetiradas(data.retiradas),
+      this.saveClientes(accessToken, spreadsheetId, data.clients),
+      this.saveOrdens(accessToken, spreadsheetId, data.orders),
+      this.saveRetiradas(accessToken, spreadsheetId, data.retiradas),
     ]);
   }
 
-  async loadAll(): Promise<{
+  async loadAll(accessToken: string, spreadsheetId: string): Promise<{
     catalogo: EquipmentModel[];
     stock: StockItem[];
     clients: Client[];
@@ -372,10 +331,10 @@ export class SheetsSyncService {
     retiradas: Retirada[];
   }> {
     const [catalogo, clients, orders, retiradas] = await Promise.all([
-      this.loadEquipamentos(),
-      this.loadClientes(),
-      this.loadOrdens(),
-      this.loadRetiradas(),
+      this.loadEquipamentos(accessToken, spreadsheetId),
+      this.loadClientes(accessToken, spreadsheetId),
+      this.loadOrdens(accessToken, spreadsheetId),
+      this.loadRetiradas(accessToken, spreadsheetId),
     ]);
 
     // Estoque não é mais carregado do Sheets - é calculado dinamicamente
@@ -385,4 +344,3 @@ export class SheetsSyncService {
 
 // Instância singleton
 export const sheetsSyncService = new SheetsSyncService();
-

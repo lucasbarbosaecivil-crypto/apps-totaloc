@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { sheetsSyncService, SyncStatus } from '../services/sheetsSyncService';
-import { getServiceAccountConfig } from '../services/serviceAccountAuth';
+import { sheetsSyncService } from '../services/sheetsSyncService';
 import {
   EquipmentModel,
   StockItem,
@@ -12,6 +11,7 @@ import {
 interface UseSheetsSyncReturn {
   // Estado
   isAuthenticated: boolean;
+  accessToken: string | null;
   isSyncing: boolean;
   lastSync: Date | null;
   syncError: string | null;
@@ -25,97 +25,68 @@ interface UseSheetsSyncReturn {
     stock: StockItem[];
     clients: Client[];
     orders: ServiceOrder[];
+    retiradas: Retirada[];
   }) => Promise<void>;
   loadAll: () => Promise<{
     catalogo: EquipmentModel[];
     stock: StockItem[];
     clients: Client[];
     orders: ServiceOrder[];
+    retiradas: Retirada[];
   } | null>;
   setSpreadsheetId: (id: string) => void;
 }
 
 /**
- * Hook para gerenciar sincronização com Google Sheets
+ * Hook para gerenciar sincronização com Google Sheets usando OAuth 2.0
  */
 export function useSheetsSync(): UseSheetsSyncReturn {
-  // Com Service Account, sempre está autenticado
-  const [isAuthenticated, setIsAuthenticated] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [accessToken, setAccessToken] = useState<string | null>(() => {
+    // Tenta recuperar token do localStorage
+    return localStorage.getItem('google_access_token');
+  });
+  
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   
   // ID da planilha padrão ou do localStorage
   const [spreadsheetId, setSpreadsheetIdState] = useState<string>(() => {
-    const saConfig = getServiceAccountConfig();
-    return localStorage.getItem('sheets_spreadsheet_id') || saConfig.spreadsheetId;
+    return localStorage.getItem('sheets_spreadsheet_id') || '1BoQDpRDjg_Cwp-9OSkf2emUdkmdF7xx5ZIPGJNm5vuQ';
   });
 
-  // Configura Service Account automaticamente ao carregar (com tratamento de erro)
+  // Verifica autenticação ao carregar
   useEffect(() => {
-    // Configura com Service Account de forma assíncrona e segura
-    const setupServiceAccount = async () => {
-      try {
-        console.log('🔧 Configurando Service Account...');
-        // Configura com Service Account usando getAccessToken
-        const config = getServiceAccountConfig();
-        // Usa spreadsheetId do localStorage se existir, senão usa o padrão
-        const spreadsheetIdToUse = localStorage.getItem('sheets_spreadsheet_id') || config.spreadsheetId;
-        console.log(`📊 Usando Spreadsheet ID: ${spreadsheetIdToUse.substring(0, 20)}...`);
-        sheetsSyncService.setConfig({
-          spreadsheetId: spreadsheetIdToUse,
-          getAccessToken: config.getAccessToken,
-        });
-        // Testa a autenticação tentando obter um token
-        try {
-          const token = await config.getAccessToken();
-          console.log('✅ Service Account configurado com sucesso');
-          setIsAuthenticated(true);
-          setSyncError(null);
-        } catch (authError: any) {
-          console.error('❌ Erro ao autenticar Service Account:', authError);
-          const errorMsg = authError.message || 'Erro ao autenticar';
-          // Verifica se é erro de arquivo não encontrado
-          if (errorMsg.includes('404') || errorMsg.includes('Não foi possível carregar credenciais')) {
-            setSyncError('Arquivo de credenciais não encontrado. Verifique se o arquivo JSON está na pasta public/');
-          } else {
-            setSyncError(`Erro de autenticação: ${errorMsg}`);
-          }
-          setIsAuthenticated(false);
-        }
-      } catch (error: any) {
-        console.error('❌ Erro ao configurar Service Account:', error);
-        setSyncError(error.message || 'Erro ao configurar autenticação');
-        setIsAuthenticated(false);
-      }
-    };
+    const token = localStorage.getItem('google_access_token');
+    const savedSpreadsheetId = localStorage.getItem('sheets_spreadsheet_id');
     
-    setupServiceAccount();
+    if (token) {
+      setIsAuthenticated(true);
+      setAccessToken(token);
+      if (savedSpreadsheetId) {
+        setSpreadsheetIdState(savedSpreadsheetId);
+      }
+    } else {
+      setIsAuthenticated(false);
+      setAccessToken(null);
+    }
   }, []);
 
-  const authenticate = useCallback((spreadsheetId: string, accessToken?: string) => {
-    // Com Service Account, não precisa de accessToken manual
+  const authenticate = useCallback((spreadsheetId: string, token: string) => {
+    localStorage.setItem('google_access_token', token);
     localStorage.setItem('sheets_spreadsheet_id', spreadsheetId);
+    setAccessToken(token);
     setSpreadsheetIdState(spreadsheetId);
-    
-    // Reconfigura Service Account
-    const config = getServiceAccountConfig();
-    sheetsSyncService.setConfig({
-      spreadsheetId: spreadsheetId,
-      getAccessToken: config.getAccessToken,
-    });
-    
     setIsAuthenticated(true);
     setSyncError(null);
   }, []);
 
   const disconnect = useCallback(() => {
-    // Com Service Account, não desconecta completamente
-    // Apenas limpa preferências do usuário
+    localStorage.removeItem('google_access_token');
     localStorage.removeItem('sheets_spreadsheet_id');
-    const saConfig = getServiceAccountConfig();
-    setSpreadsheetIdState(saConfig.spreadsheetId);
-    setIsAuthenticated(true); // Sempre autenticado com Service Account
+    setAccessToken(null);
+    setIsAuthenticated(false);
     setSyncError(null);
   }, []);
 
@@ -131,16 +102,16 @@ export function useSheetsSync(): UseSheetsSyncReturn {
     orders: ServiceOrder[];
     retiradas: Retirada[];
   }) => {
-    if (!isAuthenticated) {
-      throw new Error('Não autenticado. Conecte-se ao Google Sheets primeiro.');
+    if (!isAuthenticated || !accessToken) {
+      throw new Error('Não autenticado. Faça login com Google primeiro.');
     }
 
     setIsSyncing(true);
     setSyncError(null);
 
     try {
-      await sheetsSyncService.ensureSheetsExist();
-      await sheetsSyncService.syncAll(data);
+      await sheetsSyncService.ensureSheetsExist(accessToken, spreadsheetId);
+      await sheetsSyncService.syncAll(accessToken, spreadsheetId, data);
       setLastSync(new Date());
     } catch (error: any) {
       setSyncError(error.message || 'Erro ao sincronizar');
@@ -148,11 +119,11 @@ export function useSheetsSync(): UseSheetsSyncReturn {
     } finally {
       setIsSyncing(false);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, accessToken, spreadsheetId]);
 
   const loadAll = useCallback(async () => {
-    if (!isAuthenticated) {
-      const errorMsg = 'Não autenticado. Configure o Google Sheets primeiro.';
+    if (!isAuthenticated || !accessToken) {
+      const errorMsg = 'Não autenticado. Faça login com Google primeiro.';
       setSyncError(errorMsg);
       console.warn('⚠️', errorMsg);
       return null;
@@ -163,7 +134,7 @@ export function useSheetsSync(): UseSheetsSyncReturn {
     console.log('📥 Carregando dados do Google Sheets...');
 
     try {
-      const data = await sheetsSyncService.loadAll();
+      const data = await sheetsSyncService.loadAll(accessToken, spreadsheetId);
       if (data) {
         console.log(`✅ Dados carregados do Google Sheets:`);
         console.log(`   - Equipamentos: ${data.catalogo.length}`);
@@ -188,9 +159,11 @@ export function useSheetsSync(): UseSheetsSyncReturn {
       if (errorMsg.includes('404')) {
         userFriendlyError = 'Planilha não encontrada. Verifique o ID da planilha.';
       } else if (errorMsg.includes('403') || errorMsg.includes('permission')) {
-        userFriendlyError = 'Sem permissão para acessar a planilha. Compartilhe a planilha com o email da Service Account.';
+        userFriendlyError = 'Sem permissão para acessar a planilha. Verifique as permissões do Google OAuth.';
       } else if (errorMsg.includes('401') || errorMsg.includes('Unauthorized')) {
-        userFriendlyError = 'Erro de autenticação. Verifique as credenciais.';
+        userFriendlyError = 'Token expirado. Faça login novamente.';
+        // Limpa token inválido
+        disconnect();
       } else if (errorMsg.includes('fetch')) {
         userFriendlyError = 'Erro de conexão. Verifique sua conexão com a internet.';
       }
@@ -200,10 +173,11 @@ export function useSheetsSync(): UseSheetsSyncReturn {
     } finally {
       setIsSyncing(false);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, accessToken, spreadsheetId, disconnect]);
 
   return {
     isAuthenticated,
+    accessToken,
     isSyncing,
     lastSync,
     syncError,
@@ -215,4 +189,3 @@ export function useSheetsSync(): UseSheetsSyncReturn {
     setSpreadsheetId,
   };
 }
-

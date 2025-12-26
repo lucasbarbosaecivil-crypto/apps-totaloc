@@ -1,15 +1,8 @@
 /**
  * Google Sheets Service
  * Gerencia todas as operações de leitura e escrita no Google Sheets
+ * Agora usa OAuth 2.0 (token do usuário) ao invés de Service Account
  */
-
-import { authenticateWithServiceAccount } from './serviceAccountAuth';
-
-export interface SheetsConfig {
-  spreadsheetId: string;
-  accessToken?: string; // Opcional, será obtido via Service Account se não fornecido
-  getAccessToken?: () => Promise<string>; // Função para obter token dinamicamente
-}
 
 export interface SheetRange {
   sheetName: string;
@@ -17,50 +10,32 @@ export interface SheetRange {
 }
 
 /**
- * Converte dados do App para formato de array do Sheets
- */
-export function convertToSheetRows<T>(
-  data: T[],
-  mapper: (item: T) => any[]
-): any[][] {
-  return data.map(mapper);
-}
-
-/**
- * Converte linhas do Sheets para dados do App
- */
-export function convertFromSheetRows<T>(
-  rows: any[][],
-  headers: string[],
-  mapper: (row: any[], headers: string[]) => T
-): T[] {
-  if (!rows || rows.length === 0) return [];
-  // Pula a primeira linha (cabeçalhos)
-  const dataRows = rows.slice(1);
-  return dataRows.map(row => mapper(row, headers));
-}
-
-/**
- * Lê dados de uma planilha específica
+ * Função genérica para ler dados do Google Sheets
  */
 export async function readSheetData(
-  config: SheetsConfig,
-  sheetRange: SheetRange
+  accessToken: string,
+  spreadsheetId: string,
+  range: SheetRange
 ): Promise<any[][]> {
-  // Se não especificar range, usa toda a aba (melhor para ler dados dinâmicos)
-  const range = sheetRange.range 
-    ? `${sheetRange.sheetName}!${sheetRange.range}` 
-    : `${sheetRange.sheetName}!A:Z`; // Lê até a coluna Z por padrão
+  if (!accessToken) {
+    throw new Error('Token de acesso não fornecido. Faça login com Google primeiro.');
+  }
 
-  // Obter access token (via função ou valor estático)
-  const accessToken = config.accessToken || 
-    (config.getAccessToken ? await config.getAccessToken() : await authenticateWithServiceAccount());
+  if (!spreadsheetId) {
+    throw new Error('ID da planilha não fornecido.');
+  }
+
+  // Se não especificar range, usa toda a aba (melhor para ler dados dinâmicos)
+  const rangeStr = range.range 
+    ? `${range.sheetName}!${range.range}` 
+    : `${range.sheetName}!A:Z`; // Lê até a coluna Z por padrão
 
   try {
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${config.spreadsheetId}/values/${range}`;
-    console.log(`🔍 Lendo planilha: ${range} (Spreadsheet ID: ${config.spreadsheetId.substring(0, 10)}...)`);
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${rangeStr}`;
+    console.log(`🔍 Lendo planilha: ${rangeStr} (Spreadsheet ID: ${spreadsheetId.substring(0, 10)}...)`);
     
     const response = await fetch(url, {
+      method: 'GET',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
@@ -72,7 +47,7 @@ export async function readSheetData(
       const errorMsg = errorData.error?.message || response.statusText;
       console.error(`❌ Erro HTTP ${response.status} ao ler planilha:`, errorMsg);
       console.error('   Detalhes do erro:', errorData);
-      throw new Error(`Erro ao ler planilha ${sheetRange.sheetName}: ${errorMsg}`);
+      throw new Error(`Erro ao ler planilha ${range.sheetName}: ${errorMsg}`);
     }
 
     const data = await response.json();
@@ -80,7 +55,7 @@ export async function readSheetData(
     console.log(`✅ Leitura bem-sucedida: ${values.length} linhas encontradas`);
     return values;
   } catch (error: any) {
-    console.error(`❌ Erro ao ler do Google Sheets (aba: ${sheetRange.sheetName}):`, error);
+    console.error(`❌ Erro ao ler do Google Sheets (aba: ${range.sheetName}):`, error);
     if (error.message) {
       console.error('   Mensagem:', error.message);
     }
@@ -93,23 +68,24 @@ export async function readSheetData(
  * @param append Se true, adiciona no final; se false, substitui
  */
 export async function writeSheetData(
-  config: SheetsConfig,
-  sheetRange: SheetRange,
+  accessToken: string,
+  spreadsheetId: string,
+  range: SheetRange,
   values: any[][],
   append: boolean = false
 ): Promise<void> {
-  const range = sheetRange.range 
-    ? `${sheetRange.sheetName}!${sheetRange.range}` 
-    : `${sheetRange.sheetName}`;
+  if (!accessToken) {
+    throw new Error('Token de acesso não fornecido. Faça login com Google primeiro.');
+  }
 
-  // Obter access token (via função ou valor estático)
-  const accessToken = config.accessToken || 
-    (config.getAccessToken ? await config.getAccessToken() : await authenticateWithServiceAccount());
+  const rangeStr = range.range 
+    ? `${range.sheetName}!${range.range}` 
+    : `${range.sheetName}!A:Z`;
 
   try {
     const url = append
-      ? `https://sheets.googleapis.com/v4/spreadsheets/${config.spreadsheetId}/values/${range}:append?valueInputOption=RAW`
-      : `https://sheets.googleapis.com/v4/spreadsheets/${config.spreadsheetId}/values/${range}?valueInputOption=RAW`;
+      ? `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${rangeStr}:append?valueInputOption=RAW`
+      : `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${rangeStr}?valueInputOption=RAW`;
 
     const method = append ? 'POST' : 'PUT';
 
@@ -121,7 +97,7 @@ export async function writeSheetData(
       },
       body: JSON.stringify({
         values,
-        ...(append ? {} : { range }),
+        ...(append ? {} : { range: rangeStr }),
       }),
     });
 
@@ -139,19 +115,20 @@ export async function writeSheetData(
  * Limpa e reescreve toda a planilha (útil para sincronização completa)
  */
 export async function clearAndWriteSheet(
-  config: SheetsConfig,
+  accessToken: string,
+  spreadsheetId: string,
   sheetName: string,
   headers: string[],
   data: any[][]
 ): Promise<void> {
-  // Obter access token
-  const accessToken = config.accessToken || 
-    (config.getAccessToken ? await config.getAccessToken() : await authenticateWithServiceAccount());
+  if (!accessToken) {
+    throw new Error('Token de acesso não fornecido. Faça login com Google primeiro.');
+  }
 
   try {
     // Primeiro, limpa a planilha
     await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${config.spreadsheetId}/values/${sheetName}!A:Z:clear`,
+      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}!A:Z:clear`,
       {
         method: 'POST',
         headers: {
@@ -161,52 +138,11 @@ export async function clearAndWriteSheet(
       }
     );
 
-    // Depois, escreve cabeçalhos + dados
-    const allValues = [headers, ...data];
-    await writeSheetData(
-      config,
-      { sheetName, range: 'A:Z' },
-      allValues,
-      false
-    );
+    // Depois, escreve cabeçalhos e dados
+    const allRows = [headers, ...data];
+    await writeSheetData(accessToken, spreadsheetId, { sheetName }, allRows, false);
   } catch (error) {
     console.error('Erro ao limpar e reescrever planilha:', error);
-    throw error;
-  }
-}
-
-/**
- * Atualiza uma linha específica na planilha baseado em ID
- */
-export async function updateRowById(
-  config: SheetsConfig,
-  sheetName: string,
-  rowId: string,
-  idColumnIndex: number,
-  newValues: any[]
-): Promise<void> {
-  try {
-    // Primeiro, encontra a linha com o ID
-    const allData = await readSheetData(config, { sheetName });
-    if (!allData || allData.length === 0) {
-      throw new Error('Planilha vazia ou não encontrada');
-    }
-
-    const headers = allData[0];
-    const dataRows = allData.slice(1);
-
-    // Encontra o índice da linha
-    const rowIndex = dataRows.findIndex(row => row[idColumnIndex] === rowId);
-    
-    if (rowIndex === -1) {
-      throw new Error(`Linha com ID ${rowId} não encontrada`);
-    }
-
-    // Atualiza a linha (rowIndex + 2 porque Sheets começa em 1 e pula header)
-    const range = `${sheetName}!A${rowIndex + 2}:${String.fromCharCode(65 + headers.length - 1)}${rowIndex + 2}`;
-    await writeSheetData(config, { sheetName, range }, [newValues], false);
-  } catch (error) {
-    console.error('Erro ao atualizar linha:', error);
     throw error;
   }
 }
@@ -215,23 +151,24 @@ export async function updateRowById(
  * Verifica se a planilha existe e cria se não existir
  */
 export async function ensureSheetExists(
-  config: SheetsConfig,
+  accessToken: string,
+  spreadsheetId: string,
   sheetName: string
 ): Promise<boolean> {
+  if (!accessToken) {
+    throw new Error('Token de acesso não fornecido. Faça login com Google primeiro.');
+  }
+
   try {
-    // Tenta ler a planilha
-    await readSheetData(config, { sheetName, range: 'A1' });
+    // Tenta ler a planilha para verificar se existe
+    await readSheetData(accessToken, spreadsheetId, { sheetName, range: 'A1' });
     return true;
   } catch (error: any) {
-    // Se não existir, cria
+    // Se não existir, cria usando batchUpdate
     if (error.message?.includes('Unable to parse range') || error.message?.includes('not found')) {
-      // Obter access token
-      const accessToken = config.accessToken || 
-        (config.getAccessToken ? await config.getAccessToken() : await authenticateWithServiceAccount());
-      
       try {
         const createResponse = await fetch(
-          `https://sheets.googleapis.com/v4/spreadsheets/${config.spreadsheetId}:batchUpdate`,
+          `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`,
           {
             method: 'POST',
             headers: {
@@ -267,4 +204,3 @@ export async function ensureSheetExists(
     throw error;
   }
 }
-
