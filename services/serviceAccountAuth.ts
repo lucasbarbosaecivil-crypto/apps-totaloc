@@ -45,6 +45,13 @@ async function loadServiceAccountKey(): Promise<ServiceAccountConfig> {
     const data = await response.json();
     serviceAccountKey = data as ServiceAccountConfig;
     console.log('✅ Arquivo de credenciais carregado com sucesso');
+    
+    // Log para debug: mostra como a chave privada está (sem mostrar o conteúdo completo)
+    const keyPreview = serviceAccountKey.private_key.substring(0, 50) + '...';
+    console.log('🔑 Chave privada (preview):', keyPreview);
+    console.log('🔑 Chave tem \\n literal?', serviceAccountKey.private_key.includes('\\n'));
+    console.log('🔑 Chave tem quebra de linha real?', serviceAccountKey.private_key.includes('\n'));
+    
     return serviceAccountKey;
   } catch (error: any) {
     console.error('❌ Erro ao carregar Service Account Key:', error);

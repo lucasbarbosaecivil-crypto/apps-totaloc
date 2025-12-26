@@ -22,19 +22,31 @@ export async function signJWT(
   try {
     console.log('🔐 Usando biblioteca jose para assinar JWT...');
     
-    // Processa a chave privada (trata \n literais)
-    let processedKey = privateKey;
-    if (processedKey.includes('\\n')) {
+    // A chave privada vem do JSON já parseado, então \n literais já são quebras de linha reais
+    // Mas pode vir como string com \n literais se for string JSON não parseada
+    let processedKey = privateKey.trim();
+    
+    // Se tiver \\n (double backslash), são literais que precisam ser convertidos
+    if (processedKey.includes('\\\\n')) {
+      processedKey = processedKey.replace(/\\\\n/g, '\n');
+    }
+    // Se tiver \n como string literal (raramente, mas pode acontecer)
+    else if (processedKey.includes('\\n') && !processedKey.includes('\n')) {
       processedKey = processedKey.replace(/\\n/g, '\n');
     }
     
-    // jose espera a chave no formato PEM completo
-    // Se não tiver headers, adiciona
+    // jose espera a chave no formato PEM completo com headers
+    // Verifica se já tem os headers corretos
     if (!processedKey.includes('BEGIN PRIVATE KEY')) {
-      processedKey = `-----BEGIN PRIVATE KEY-----\n${processedKey.replace(/\s/g, '')}\n-----END PRIVATE KEY-----`;
+      // Se não tiver headers, adiciona (mas isso não deveria acontecer)
+      console.warn('⚠️ Chave privada sem headers PEM, adicionando...');
+      const keyContent = processedKey.replace(/\s/g, ''); // Remove todos os espaços
+      processedKey = `-----BEGIN PRIVATE KEY-----\n${keyContent}\n-----END PRIVATE KEY-----`;
     }
     
-    // Importa a chave usando jose
+    console.log('🔑 Formato da chave:', processedKey.substring(0, 50) + '...');
+    
+    // Importa a chave usando jose (espera formato PEM completo)
     const key = await importPKCS8(processedKey, 'RS256');
     console.log('✅ Chave privada importada com jose');
     
