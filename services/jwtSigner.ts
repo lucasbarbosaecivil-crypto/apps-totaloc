@@ -29,28 +29,49 @@ function base64ToArrayBuffer(base64: string): ArrayBuffer {
  * Converte chave privada PEM para CryptoKey
  */
 async function importPrivateKey(pemKey: string): Promise<CryptoKey> {
-  // Remove headers e espaços
-  const pemHeader = '-----BEGIN PRIVATE KEY-----';
-  const pemFooter = '-----END PRIVATE KEY-----';
-  const pemContents = pemKey
-    .replace(pemHeader, '')
-    .replace(pemFooter, '')
-    .replace(/\s/g, '');
+  try {
+    // Remove headers e espaços
+    const pemHeader = '-----BEGIN PRIVATE KEY-----';
+    const pemFooter = '-----END PRIVATE KEY-----';
+    
+    // Trata \n literais (quando vem do JSON como string)
+    let processedKey = pemKey;
+    if (processedKey.includes('\\n')) {
+      // Substitui \n literais por quebras de linha reais
+      processedKey = processedKey.replace(/\\n/g, '\n');
+    }
+    
+    const pemContents = processedKey
+      .replace(pemHeader, '')
+      .replace(pemFooter, '')
+      .replace(/\s/g, ''); // Remove todos os espaços e quebras de linha
 
-  // Converte base64 para ArrayBuffer
-  const keyData = base64ToArrayBuffer(pemContents);
+    console.log('🔑 Processando chave privada...');
+    console.log('   Tamanho do conteúdo base64:', pemContents.length);
+    
+    // Converte base64 para ArrayBuffer
+    const keyData = base64ToArrayBuffer(pemContents);
+    console.log('   Tamanho do ArrayBuffer:', keyData.byteLength);
 
-  // Importa a chave usando Web Crypto API
-  return await crypto.subtle.importKey(
-    'pkcs8',
-    keyData,
-    {
-      name: 'RSASSA-PKCS1-v1_5',
-      hash: 'SHA-256',
-    },
-    false,
-    ['sign']
-  );
+    // Importa a chave usando Web Crypto API
+    const key = await crypto.subtle.importKey(
+      'pkcs8',
+      keyData,
+      {
+        name: 'RSASSA-PKCS1-v1_5',
+        hash: 'SHA-256',
+      },
+      false,
+      ['sign']
+    );
+    
+    console.log('✅ Chave privada importada com sucesso');
+    return key;
+  } catch (error: any) {
+    console.error('❌ Erro ao importar chave privada:', error);
+    console.error('   Mensagem:', error.message);
+    throw new Error(`Falha ao importar chave privada: ${error.message}`);
+  }
 }
 
 /**
@@ -106,20 +127,26 @@ export async function signJWT(
     // Codifica header e payload
     const encodedHeader = base64urlEncode(JSON.stringify(header));
     const encodedPayload = base64urlEncode(JSON.stringify(payload));
+    
+    console.log('📝 JWT Header codificado:', encodedHeader.substring(0, 20) + '...');
+    console.log('📝 JWT Payload codificado:', encodedPayload.substring(0, 20) + '...');
 
     // Cria assinatura
     const data = `${encodedHeader}.${encodedPayload}`;
     const dataBuffer = new TextEncoder().encode(data);
+    console.log('📏 Tamanho do buffer para assinar:', dataBuffer.length);
 
     // Importa chave privada
     const key = await importPrivateKey(privateKey);
 
     // Assina
+    console.log('✍️ Assinando JWT...');
     const signature = await crypto.subtle.sign(
       'RSASSA-PKCS1-v1_5',
       key,
       dataBuffer
     );
+    console.log('✅ Assinatura criada, tamanho:', signature.byteLength);
 
     // Converte assinatura para base64url (método mais robusto)
     const signatureArray = new Uint8Array(signature);
