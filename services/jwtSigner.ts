@@ -6,8 +6,18 @@
 /**
  * Converte string base64 para ArrayBuffer
  */
+/**
+ * Converte string base64 para ArrayBuffer
+ * A chave privada vem em base64 padrão (não base64url)
+ */
 function base64ToArrayBuffer(base64: string): ArrayBuffer {
-  const binaryString = atob(base64.replace(/-/g, '+').replace(/_/g, '/'));
+  // Remove espaços em branco
+  const cleanBase64 = base64.trim();
+  
+  // Converte base64 para binário (sem fazer replace de - e _ pois é base64 padrão)
+  const binaryString = atob(cleanBase64);
+  
+  // Converte para ArrayBuffer
   const bytes = new Uint8Array(binaryString.length);
   for (let i = 0; i < binaryString.length; i++) {
     bytes[i] = binaryString.charCodeAt(i);
