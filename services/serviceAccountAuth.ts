@@ -46,11 +46,18 @@ async function loadServiceAccountKey(): Promise<ServiceAccountConfig> {
     serviceAccountKey = data as ServiceAccountConfig;
     console.log('✅ Arquivo de credenciais carregado com sucesso');
     
+    // CRÍTICO: Converte \n literais para quebras de linha reais
+    // Quando o JSON é parseado, se o JSON original tinha "\\n" (escape duplo),
+    // ele vira "\n" (escape simples), que precisa ser convertido para quebra de linha real
+    if (serviceAccountKey.private_key.includes('\\n')) {
+      console.log('🔧 Convertendo \\n literais para quebras de linha reais...');
+      serviceAccountKey.private_key = serviceAccountKey.private_key.replace(/\\n/g, '\n');
+    }
+    
     // Log para debug: mostra como a chave privada está (sem mostrar o conteúdo completo)
-    const keyPreview = serviceAccountKey.private_key.substring(0, 50) + '...';
+    const keyPreview = serviceAccountKey.private_key.substring(0, 60);
     console.log('🔑 Chave privada (preview):', keyPreview);
-    console.log('🔑 Chave tem \\n literal?', serviceAccountKey.private_key.includes('\\n'));
-    console.log('🔑 Chave tem quebra de linha real?', serviceAccountKey.private_key.includes('\n'));
+    console.log('🔑 Chave tem quebra de linha real após BEGIN?', serviceAccountKey.private_key.includes('BEGIN PRIVATE KEY\n'));
     
     return serviceAccountKey;
   } catch (error: any) {

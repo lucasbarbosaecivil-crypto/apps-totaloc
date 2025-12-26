@@ -22,18 +22,17 @@ export async function signJWT(
   try {
     console.log('🔐 Usando biblioteca jose para assinar JWT...');
     
-    // A chave privada vem do JSON já parseado, então \n literais já são quebras de linha reais
-    // Mas pode vir como string com \n literais se for string JSON não parseada
-    let processedKey = privateKey.trim();
+    // CRÍTICO: A chave privada pode ter \n como texto literal (duas letras: \ e n)
+    // em vez de quebras de linha reais. Precisamos converter isso.
+    // Isso acontece quando o JSON tem "\\n" (escape duplo) ou quando vem de variável de ambiente
+    let processedKey = privateKey;
     
-    // Se tiver \\n (double backslash), são literais que precisam ser convertidos
-    if (processedKey.includes('\\\\n')) {
-      processedKey = processedKey.replace(/\\\\n/g, '\n');
-    }
-    // Se tiver \n como string literal (raramente, mas pode acontecer)
-    else if (processedKey.includes('\\n') && !processedKey.includes('\n')) {
-      processedKey = processedKey.replace(/\\n/g, '\n');
-    }
+    // Primeiro, normaliza a chave - converte \n literais para quebras de linha reais
+    // O replace converte o texto "\n" em uma quebra de linha real
+    processedKey = processedKey.replace(/\\n/g, '\n');
+    
+    // Remove espaços extras no início e fim
+    processedKey = processedKey.trim();
     
     // jose espera a chave no formato PEM completo com headers
     // Verifica se já tem os headers corretos
@@ -44,7 +43,9 @@ export async function signJWT(
       processedKey = `-----BEGIN PRIVATE KEY-----\n${keyContent}\n-----END PRIVATE KEY-----`;
     }
     
-    console.log('🔑 Formato da chave:', processedKey.substring(0, 50) + '...');
+    // Log para debug (mostra apenas o início)
+    console.log('🔑 Formato da chave (primeiros 60 chars):', processedKey.substring(0, 60));
+    console.log('🔑 Chave tem quebra de linha após BEGIN?', processedKey.includes('BEGIN PRIVATE KEY\n'));
     
     // Importa a chave usando jose (espera formato PEM completo)
     const key = await importPKCS8(processedKey, 'RS256');
