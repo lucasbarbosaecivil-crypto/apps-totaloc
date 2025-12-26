@@ -47,34 +47,43 @@ export async function readSheetData(
   config: SheetsConfig,
   sheetRange: SheetRange
 ): Promise<any[][]> {
+  // Se não especificar range, usa toda a aba (melhor para ler dados dinâmicos)
   const range = sheetRange.range 
     ? `${sheetRange.sheetName}!${sheetRange.range}` 
-    : `${sheetRange.sheetName}`;
+    : `${sheetRange.sheetName}!A:Z`; // Lê até a coluna Z por padrão
 
   // Obter access token (via função ou valor estático)
   const accessToken = config.accessToken || 
     (config.getAccessToken ? await config.getAccessToken() : await authenticateWithServiceAccount());
 
   try {
-    const response = await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${config.spreadsheetId}/values/${range}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${config.spreadsheetId}/values/${range}`;
+    console.log(`🔍 Lendo planilha: ${range} (Spreadsheet ID: ${config.spreadsheetId.substring(0, 10)}...)`);
+    
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+    });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(`Erro ao ler planilha: ${error.error?.message || response.statusText}`);
+      const errorData = await response.json();
+      const errorMsg = errorData.error?.message || response.statusText;
+      console.error(`❌ Erro HTTP ${response.status} ao ler planilha:`, errorMsg);
+      console.error('   Detalhes do erro:', errorData);
+      throw new Error(`Erro ao ler planilha ${sheetRange.sheetName}: ${errorMsg}`);
     }
 
     const data = await response.json();
-    return data.values || [];
-  } catch (error) {
-    console.error('Erro ao ler do Google Sheets:', error);
+    const values = data.values || [];
+    console.log(`✅ Leitura bem-sucedida: ${values.length} linhas encontradas`);
+    return values;
+  } catch (error: any) {
+    console.error(`❌ Erro ao ler do Google Sheets (aba: ${sheetRange.sheetName}):`, error);
+    if (error.message) {
+      console.error('   Mensagem:', error.message);
+    }
     throw error;
   }
 }

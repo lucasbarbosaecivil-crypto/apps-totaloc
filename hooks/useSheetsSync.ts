@@ -59,8 +59,11 @@ export function useSheetsSync(): UseSheetsSyncReturn {
         console.log('🔧 Configurando Service Account...');
         // Configura com Service Account usando getAccessToken
         const config = getServiceAccountConfig();
+        // Usa spreadsheetId do localStorage se existir, senão usa o padrão
+        const spreadsheetIdToUse = localStorage.getItem('sheets_spreadsheet_id') || config.spreadsheetId;
+        console.log(`📊 Usando Spreadsheet ID: ${spreadsheetIdToUse.substring(0, 20)}...`);
         sheetsSyncService.setConfig({
-          spreadsheetId: config.spreadsheetId,
+          spreadsheetId: spreadsheetIdToUse,
           getAccessToken: config.getAccessToken,
         });
         // Testa a autenticação tentando obter um token
@@ -162,7 +165,17 @@ export function useSheetsSync(): UseSheetsSyncReturn {
     try {
       const data = await sheetsSyncService.loadAll();
       if (data) {
-        console.log(`✅ Dados carregados: ${data.catalogo.length} equipamentos, ${data.clients.length} clientes, ${data.orders.length} ordens, ${data.retiradas?.length || 0} retiradas`);
+        console.log(`✅ Dados carregados do Google Sheets:`);
+        console.log(`   - Equipamentos: ${data.catalogo.length}`);
+        console.log(`   - Clientes: ${data.clients.length}`);
+        console.log(`   - Ordens: ${data.orders.length}`);
+        console.log(`   - Retiradas: ${data.retiradas?.length || 0}`);
+        
+        if (data.catalogo.length === 0) {
+          console.warn('⚠️ Nenhum equipamento foi carregado. Verifique se a aba EQUIPAMENTOS possui dados.');
+        }
+      } else {
+        console.warn('⚠️ loadAll retornou null - nenhum dado foi carregado');
       }
       setLastSync(new Date());
       return data;

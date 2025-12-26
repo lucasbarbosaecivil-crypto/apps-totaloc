@@ -110,14 +110,41 @@ export class SheetsSyncService {
     if (!this.config) throw new Error('Serviço não configurado');
 
     try {
+      console.log('📥 Carregando equipamentos da aba EQUIPAMENTOS...');
       const rows = await readSheetData(this.config, { sheetName: 'EQUIPAMENTOS' });
-      if (!rows || rows.length === 0) return [];
+      console.log(`📊 Linhas lidas: ${rows?.length || 0}`);
+      
+      if (!rows || rows.length === 0) {
+        console.log('⚠️ Planilha EQUIPAMENTOS está vazia ou não possui dados');
+        return [];
+      }
 
       const headers = rows[0];
-      return rows.slice(1).map(row => rowToEquipamento(row, headers));
+      console.log('📋 Cabeçalhos encontrados:', headers);
+      
+      const dataRows = rows.slice(1);
+      console.log(`📦 Linhas de dados: ${dataRows.length}`);
+      
+      const equipamentos = dataRows.map((row, index) => {
+        try {
+          return rowToEquipamento(row, headers);
+        } catch (err: any) {
+          console.error(`❌ Erro ao converter linha ${index + 2}:`, err, 'Linha:', row);
+          return null;
+        }
+      }).filter((eq): eq is EquipmentModel => eq !== null);
+      
+      console.log(`✅ ${equipamentos.length} equipamentos carregados com sucesso`);
+      return equipamentos;
     } catch (error: any) {
-      if (error.message?.includes('Unable to parse range')) {
-        // Planilha vazia, retorna array vazio
+      console.error('❌ Erro ao carregar equipamentos:', error);
+      console.error('   Mensagem:', error.message);
+      console.error('   Stack:', error.stack);
+      
+      if (error.message?.includes('Unable to parse range') || 
+          error.message?.includes('not found')) {
+        // Planilha vazia ou não encontrada, retorna array vazio
+        console.log('⚠️ Planilha vazia ou não encontrada, retornando array vazio');
         return [];
       }
       throw error;
