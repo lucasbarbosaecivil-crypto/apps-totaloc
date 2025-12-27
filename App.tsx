@@ -1002,15 +1002,34 @@ const App: React.FC = () => {
   };
 
   // Função para excluir equipamento
-  const handleDeleteEquipment = (id: string) => {
+  const handleDeleteEquipment = async (id: string) => {
     if (window.confirm('Tem certeza que deseja excluir este equipamento? Isso também excluirá todos os itens de estoque relacionados.')) {
-      setCatalogo(catalogo.filter(e => e.id !== id));
-      setStock(stock.filter(s => s.modelId !== id));
+      const updatedCatalogo = catalogo.filter(e => e.id !== id);
+      const updatedStock = stock.filter(s => s.modelId !== id);
+      setCatalogo(updatedCatalogo);
+      setStock(updatedStock);
       toast.success('Equipamento excluído com sucesso!');
+      
+      // 💾 Sincronização imediata com Google Sheets após excluir
+      if (isAuthenticated && accessToken && dataLoaded) {
+        try {
+          await syncAll({
+            catalogo: updatedCatalogo,
+            stock: updatedStock,
+            clients,
+            orders,
+            retiradas
+          });
+          console.log('✅ Equipamento removido e sincronizado com Google Sheets');
+        } catch (err: any) {
+          console.error('❌ Erro ao sincronizar exclusão:', err);
+          toast.error('Equipamento excluído localmente, mas houve erro ao sincronizar com Google Sheets');
+        }
+      }
     }
   };
 
-  const handleAddCatalog = () => {
+  const handleAddCatalog = async () => {
     // Garantir que valorUnitario seja sempre um número válido
     const valorUnitario = (newCat.valorUnitario !== undefined && newCat.valorUnitario !== null)
       ? Number(newCat.valorUnitario)
@@ -1021,9 +1040,10 @@ const App: React.FC = () => {
       return;
     }
 
+    let updatedCatalogo: EquipmentModel[];
     if (editingCatId) {
       // Modo edição
-      const updatedCatalogo = catalogo.map(item => 
+      updatedCatalogo = catalogo.map(item => 
         item.id === editingCatId 
           ? {
               ...item,
@@ -1051,8 +1071,26 @@ const App: React.FC = () => {
         numSerie: newCat.numSerie || undefined,
         quantidade: newCat.quantidade !== undefined ? newCat.quantidade : undefined,
     };
-    setCatalogo([...catalogo, item]);
+      updatedCatalogo = [...catalogo, item];
+      setCatalogo(updatedCatalogo);
       toast.success('Equipamento cadastrado com sucesso!');
+    }
+
+    // 💾 Sincronização imediata com Google Sheets após salvar
+    if (isAuthenticated && accessToken && dataLoaded) {
+      try {
+        await syncAll({
+          catalogo: updatedCatalogo,
+          stock,
+          clients,
+          orders,
+          retiradas
+        });
+        console.log('✅ Equipamento sincronizado com Google Sheets');
+      } catch (err: any) {
+        console.error('❌ Erro ao sincronizar equipamento:', err);
+        toast.error('Equipamento salvo localmente, mas houve erro ao sincronizar com Google Sheets');
+      }
     }
 
     setNewCat({ unidade: RentalUnit.DIARIA, foto: 'https://images.unsplash.com/photo-1581094288338-2314dddb7bc3?w=400' });
