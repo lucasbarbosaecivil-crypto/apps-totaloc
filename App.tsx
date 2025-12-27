@@ -109,16 +109,64 @@ const App: React.FC = () => {
     clients,
     orders,
     retiradas,
+    despesas,
     setCatalogo,
     setStock,
     setClients,
     setOrders,
     setRetiradas,
+    setDespesas,
     // NÃO vamos mais usar syncToSheets ou loadFromSheets daqui
   } = useSyncState();
 
   // Estoque é calculado dinamicamente - não precisa de base separada
   // O estoque disponível é calculado em tempo real baseado nos equipamentos e locações ativas
+
+  // ⚡ Carregar dados automaticamente assim que logar
+  useEffect(() => {
+    const autoLoadData = async () => {
+      // Verifica se está logado e se AINDA NÃO carregou (dataLoaded é false)
+      if (isAuthenticated && accessToken && !dataLoaded && !isSyncing) {
+        console.log("🚀 Tentando carga inicial de dados...");
+        
+        try {
+          const data = await loadAll();
+          
+          if (data) {
+            console.log("✅ Dados recebidos com sucesso!", {
+              catalogo: data.catalogo?.length || 0,
+              clients: data.clients?.length || 0,
+              orders: data.orders?.length || 0,
+              retiradas: data.retiradas?.length || 0,
+              despesas: data.despesas?.length || 0,
+            });
+            
+            // Atualiza todos os estados
+            setCatalogo(data.catalogo || []);
+            setClients(data.clients || []);
+            setOrders(data.orders || []);
+            setRetiradas(data.retiradas || []);
+            setDespesas(data.despesas || []); // Garante que despesas está aqui
+            
+            if (data.stock && data.stock.length > 0) setStock(data.stock);
+            
+            // 🔓 DESTRAVA O SISTEMA
+            setDataLoaded(true);
+            
+            toast.success('Dados carregados e sistema pronto!');
+          } else {
+            console.warn("⚠️ loadAll retornou vazio/null");
+            toast.error("Falha ao receber dados. Tente clicar em Atualizar.");
+          }
+        } catch (error: any) {
+          console.error("❌ Erro fatal no auto-load:", error);
+          toast.error("Erro de conexão com a planilha.");
+        }
+      }
+    };
+
+    autoLoadData();
+  }, [isAuthenticated, accessToken, dataLoaded, isSyncing, loadAll, setCatalogo, setClients, setOrders, setRetiradas, setDespesas, setStock, toast]);
 
   // Auto-sync quando houver mudanças (com debounce melhorado)
   useEffect(() => {
@@ -420,11 +468,7 @@ const App: React.FC = () => {
   const [selectedQuantity, setSelectedQuantity] = useState<number>(1);
   const [addMode, setAddMode] = useState<'id' | 'quantity'>('id'); // Modo de adicionar: por ID ou por quantidade
   
-  // Estado para despesas
-  const [despesas, setDespesas] = useState<Despesa[]>(() => {
-    const saved = localStorage.getItem('rental_despesas');
-    return saved ? JSON.parse(saved) : [];
-  });
+  // Estado para despesas (agora gerenciado pelo useSyncState - removido useState duplicado)
   const [newDespesa, setNewDespesa] = useState<Partial<Despesa>>({
     data: new Date().toISOString().split('T')[0], // Data atual como padrão
     agrupador: AgrupadorDespesa.OUTROS, // Valor padrão: Outros
@@ -432,11 +476,6 @@ const App: React.FC = () => {
     valor: 0
   });
   const [editingDespesaId, setEditingDespesaId] = useState<string | null>(null);
-
-  // Sincroniza despesas com localStorage
-  useEffect(() => {
-    localStorage.setItem('rental_despesas', JSON.stringify(despesas));
-  }, [despesas]);
 
   const [newRetirada, setNewRetirada] = useState<Partial<Retirada>>({
     dataRetirada: new Date().toISOString().split('T')[0],
@@ -1603,7 +1642,8 @@ const App: React.FC = () => {
                 stock,
                 clients,
                 orders,
-                retiradas
+                retiradas,
+                despesas
               });
               toast.success('Dados sincronizados com sucesso!');
             }}
@@ -1725,7 +1765,8 @@ const App: React.FC = () => {
                     stock,
                     clients,
                     orders,
-                    retiradas
+                    retiradas,
+                    despesas
                   });
                   toast.success('Dados sincronizados com sucesso!');
                 } catch (error: any) {

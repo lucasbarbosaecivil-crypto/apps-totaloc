@@ -5,6 +5,7 @@ import {
   Client,
   ServiceOrder,
   Retirada,
+  Despesa,
 } from '../types';
 // RentalUnit e OSStatus não são mais usados aqui (foram removidos os dados padrão)
 
@@ -15,6 +16,7 @@ interface UseSyncStateReturn {
   clients: Client[];
   orders: ServiceOrder[];
   retiradas: Retirada[];
+  despesas: Despesa[];
   
   // Setters
   setCatalogo: (data: EquipmentModel[]) => void;
@@ -22,6 +24,7 @@ interface UseSyncStateReturn {
   setClients: (data: Client[]) => void;
   setOrders: (data: ServiceOrder[]) => void;
   setRetiradas: (data: Retirada[]) => void;
+  setDespesas: (data: Despesa[]) => void;
   
   // Ações
   saveToLocalStorage: () => void;
@@ -63,6 +66,11 @@ export function useSyncState(): UseSyncStateReturn {
     return [];
   });
 
+  const [despesas, setDespesas] = useState<Despesa[]>(() => {
+    // Não carrega do localStorage na inicialização - dados devem vir do Google Sheets
+    return [];
+  });
+
   // localStorage usado apenas como cache temporário - Google Sheets é a fonte de verdade
   // Sincroniza com localStorage quando houver dados (sem verificar autenticação aqui, pois é gerenciado pelo App.tsx)
   useEffect(() => {
@@ -98,13 +106,20 @@ export function useSyncState(): UseSyncStateReturn {
     }
   }, [retiradas]);
 
+  useEffect(() => {
+    if (despesas.length > 0) {
+      localStorage.setItem('rental_despesas', JSON.stringify(despesas));
+    }
+  }, [despesas]);
+
   const saveToLocalStorage = useCallback(() => {
     localStorage.setItem('rental_catalogo', JSON.stringify(catalogo));
     localStorage.setItem('rental_stock', JSON.stringify(stock));
     localStorage.setItem('rental_clients', JSON.stringify(clients));
     localStorage.setItem('rental_orders', JSON.stringify(orders));
     localStorage.setItem('rental_retiradas', JSON.stringify(retiradas));
-  }, [catalogo, stock, clients, orders, retiradas]);
+    localStorage.setItem('rental_despesas', JSON.stringify(despesas));
+  }, [catalogo, stock, clients, orders, retiradas, despesas]);
 
   const loadFromLocalStorage = useCallback(() => {
     // Não carrega mais do localStorage - Google Sheets é a única fonte de dados
@@ -119,11 +134,13 @@ export function useSyncState(): UseSyncStateReturn {
     clients,
     orders,
     retiradas,
+    despesas,
     setCatalogo,
     setStock,
     setClients,
     setOrders,
     setRetiradas,
+    setDespesas,
     saveToLocalStorage,
     loadFromLocalStorage,
   };

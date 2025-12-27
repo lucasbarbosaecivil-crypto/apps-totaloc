@@ -350,6 +350,46 @@ export class SheetsSyncService {
     }
   }
 
+  // ==================== DESPESAS ====================
+
+  async loadDespesas(accessToken: string, spreadsheetId: string): Promise<Despesa[]> {
+    try {
+      const rows = await readSheetData(accessToken, spreadsheetId, { sheetName: 'DESPESAS' });
+      if (!rows || rows.length === 0) return [];
+
+      const headers = rows[0];
+      return rows.slice(1).map(row => rowToDespesa(row, headers));
+    } catch (error: any) {
+      if (error.message?.includes('Unable to parse range') || error.message?.includes('not found')) {
+        return []; // Aba ainda não existe
+      }
+      console.error("❌ Erro ao ler despesas:", error);
+      return [];
+    }
+  }
+
+  async saveDespesas(accessToken: string, spreadsheetId: string, data: Despesa[]): Promise<void> {
+    this.syncStatus.isSyncing = true;
+    try {
+      // 🛡️ PROTEÇÃO: Verifica se há dados antes de salvar
+      if (!data || data.length === 0) {
+        console.warn('⚠️ Tentativa de salvar despesas vazias. Operação cancelada.');
+        return;
+      }
+
+      await ensureSheetExists(accessToken, spreadsheetId, 'DESPESAS');
+      const rows = data.map(despesaToRow);
+      await clearAndWriteSheet(accessToken, spreadsheetId, 'DESPESAS', DESPESAS_HEADERS, rows);
+      this.syncStatus.lastSync = new Date();
+      this.syncStatus.error = null;
+    } catch (error: any) {
+      this.syncStatus.error = error.message;
+      throw error;
+    } finally {
+      this.syncStatus.isSyncing = false;
+    }
+  }
+
   // ==================== SINCRONIZAÇÃO COMPLETA ====================
 
   async syncAll(
@@ -432,6 +472,9 @@ export class SheetsSyncService {
     retiradas: Retirada[];
     despesas: Despesa[];
   }> {
+    // Garante que as abas existem antes de ler
+    await this.ensureSheetsExist(accessToken, spreadsheetId);
+    
     const [catalogo, clients, orders, retiradas, despesas] = await Promise.all([
       this.loadEquipamentos(accessToken, spreadsheetId),
       this.loadClientes(accessToken, spreadsheetId),
