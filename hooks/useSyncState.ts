@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useSheetsSync } from './useSheetsSync';
 import {
   EquipmentModel,
   StockItem,
@@ -27,29 +26,16 @@ interface UseSyncStateReturn {
   // Ações
   saveToLocalStorage: () => void;
   loadFromLocalStorage: () => void;
-  syncToSheets: () => Promise<void>;
-  loadFromSheets: () => Promise<{ success: boolean; message?: string }>;
-  
-  // Status
-  isSyncing: boolean;
-  syncError: string | null;
-  lastSync: Date | null;
 }
 
 /**
  * Hook que gerencia estado sincronizado - Google Sheets é a fonte de verdade
  * localStorage é usado apenas como cache temporário após carregar do Sheets
+ * 
+ * NOTA: Este hook NÃO depende mais de useSheetsSync para evitar dependências circulares.
+ * O App.tsx gerencia a sincronização diretamente usando useSheetsSync.
  */
 export function useSyncState(): UseSyncStateReturn {
-  const {
-    isAuthenticated,
-    isSyncing,
-    lastSync,
-    syncError,
-    syncAll,
-    loadAll,
-  } = useSheetsSync();
-
   // Estado local - inicia vazio, dados vêm exclusivamente do Google Sheets
   const [catalogo, setCatalogo] = useState<EquipmentModel[]>(() => {
     // Não carrega do localStorage na inicialização - dados devem vir do Google Sheets
@@ -78,39 +64,39 @@ export function useSyncState(): UseSyncStateReturn {
   });
 
   // localStorage usado apenas como cache temporário - Google Sheets é a fonte de verdade
-  // Sincroniza com localStorage apenas se já estiver autenticado e houver dados do Sheets
+  // Sincroniza com localStorage quando houver dados (sem verificar autenticação aqui, pois é gerenciado pelo App.tsx)
   useEffect(() => {
-    // Só salva no localStorage se tiver dados do Google Sheets (evita sobrescrever com arrays vazios antes do carregamento)
-    if (isAuthenticated && catalogo.length > 0) {
+    // Só salva no localStorage se tiver dados (evita sobrescrever com arrays vazios antes do carregamento)
+    if (catalogo.length > 0) {
       localStorage.setItem('rental_catalogo', JSON.stringify(catalogo));
     }
-  }, [catalogo, isAuthenticated]);
+  }, [catalogo]);
 
   useEffect(() => {
     // Stock não precisa ser salvo no localStorage (é calculado dinamicamente)
     // Mas podemos salvar como cache se necessário
-    if (isAuthenticated && stock.length > 0) {
+    if (stock.length > 0) {
       localStorage.setItem('rental_stock', JSON.stringify(stock));
     }
-  }, [stock, isAuthenticated]);
+  }, [stock]);
 
   useEffect(() => {
-    if (isAuthenticated && clients.length > 0) {
+    if (clients.length > 0) {
       localStorage.setItem('rental_clients', JSON.stringify(clients));
     }
-  }, [clients, isAuthenticated]);
+  }, [clients]);
 
   useEffect(() => {
-    if (isAuthenticated && orders.length > 0) {
+    if (orders.length > 0) {
       localStorage.setItem('rental_orders', JSON.stringify(orders));
     }
-  }, [orders, isAuthenticated]);
+  }, [orders]);
 
   useEffect(() => {
-    if (isAuthenticated && retiradas.length > 0) {
+    if (retiradas.length > 0) {
       localStorage.setItem('rental_retiradas', JSON.stringify(retiradas));
     }
-  }, [retiradas, isAuthenticated]);
+  }, [retiradas]);
 
   const saveToLocalStorage = useCallback(() => {
     localStorage.setItem('rental_catalogo', JSON.stringify(catalogo));
@@ -126,86 +112,6 @@ export function useSyncState(): UseSyncStateReturn {
     console.log('⚠️ loadFromLocalStorage não é mais usado - use loadFromSheets()');
   }, []);
 
-  const syncToSheets = useCallback(async () => {
-    if (!isAuthenticated) {
-      throw new Error('Não autenticado. Conecte-se ao Google Sheets primeiro.');
-    }
-
-    await syncAll({
-      catalogo,
-      stock,
-      clients,
-      orders,
-      retiradas,
-      despesas: [], // Despesas não são gerenciadas pelo useSyncState, então passa vazio
-    });
-  }, [isAuthenticated, catalogo, stock, clients, orders, retiradas, syncAll]);
-
-  const loadFromSheets = useCallback(async (): Promise<{ success: boolean; message?: string }> => {
-    if (!isAuthenticated) {
-      const msg = 'Não autenticado. Configure o Google Sheets primeiro.';
-      console.warn('⚠️', msg);
-      return { success: false, message: msg };
-    }
-
-    try {
-      console.log('🔄 Iniciando carregamento dos dados do Google Sheets...');
-      const data = await loadAll();
-      if (data) {
-        // Google Sheets é a fonte de verdade - sempre sobrescreve, mesmo se vazio
-        setCatalogo(data.catalogo || []);
-        setClients(data.clients || []);
-        setOrders(data.orders || []);
-        setRetiradas(data.retiradas || []);
-        
-        // Stock: se houver dados no Sheets, carrega; senão, mantém vazio (será calculado dinamicamente)
-        if (data.stock && data.stock.length > 0) {
-          console.log(`✅ Carregando ${data.stock.length} itens do stock do Sheets`);
-          setStock(data.stock);
-        } else {
-          // Stock vazio no Sheets - mantém vazio (será calculado dinamicamente baseado em equipamentos e locações)
-          console.log('ℹ️ Stock vazio no Sheets, será calculado dinamicamente');
-          setStock([]);
-        }
-        
-        const totalItems = data.catalogo.length + data.clients.length + data.orders.length + (data.retiradas?.length || 0);
-        const successMsg = `Dados carregados com sucesso! (${totalItems} registros)`;
-        console.log(`✅ ${successMsg}`);
-        return { success: true, message: successMsg };
-      } else {
-        const msg = 'Nenhum dado retornado do Google Sheets.';
-        console.warn('⚠️', msg);
-        return { success: false, message: msg };
-      }
-    } catch (error: any) {
-      const errorMsg = error.message || 'Erro desconhecido ao carregar dados';
-      console.error('❌ Erro ao carregar do Sheets:', error);
-      return { success: false, message: errorMsg };
-    }
-  }, [isAuthenticated, loadAll]);
-
-  // Carrega do Sheets ao autenticar (com tratamento de erro)
-  // IMPORTANTE: Este useEffect deve vir DEPOIS da declaração de loadFromSheets
-  useEffect(() => {
-    if (isAuthenticated) {
-      console.log('🔄 Tentando carregar dados do Google Sheets automaticamente...');
-      loadFromSheets()
-        .then((result) => {
-          if (result.success) {
-            console.log('✅ Carregamento automático concluído:', result.message);
-          } else {
-            console.warn('⚠️ Carregamento automático falhou:', result.message);
-            console.log('📦 App iniciará sem dados - conecte-se ao Google Sheets para carregar');
-          }
-        })
-        .catch((error) => {
-          console.error('❌ Erro ao carregar dados do Sheets:', error);
-          console.log('📦 App iniciará sem dados - conecte-se ao Google Sheets para carregar');
-        });
-    } else {
-      console.log('⏸️ Autenticação não disponível - conecte-se ao Google Sheets para carregar dados');
-    }
-  }, [isAuthenticated, loadFromSheets]);
 
   return {
     catalogo,
@@ -220,11 +126,6 @@ export function useSyncState(): UseSyncStateReturn {
     setRetiradas,
     saveToLocalStorage,
     loadFromLocalStorage,
-    syncToSheets,
-    loadFromSheets,
-    isSyncing,
-    syncError,
-    lastSync,
   };
 }
 
