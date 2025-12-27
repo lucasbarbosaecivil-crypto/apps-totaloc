@@ -113,6 +113,7 @@ export async function writeSheetData(
 
 /**
  * Limpa e reescreve toda a planilha (útil para sincronização completa)
+ * 🛡️ PROTEÇÃO: Verifica se há dados antes de limpar a planilha
  */
 export async function clearAndWriteSheet(
   accessToken: string,
@@ -123,6 +124,13 @@ export async function clearAndWriteSheet(
 ): Promise<void> {
   if (!accessToken) {
     throw new Error('Token de acesso não fornecido. Faça login com Google primeiro.');
+  }
+
+  // 🛡️ PROTEÇÃO CRÍTICA: Se não há dados, NÃO limpa a planilha!
+  // Isso previne que arrays vazios apaguem dados existentes
+  if (!data || data.length === 0) {
+    console.warn(`⚠️ ATENÇÃO: Tentativa de salvar ${sheetName} com array vazio. Operação cancelada para proteger dados existentes.`);
+    throw new Error(`Não é permitido salvar ${sheetName} vazio. Isso apagaria dados existentes na planilha.`);
   }
 
   try {
@@ -141,8 +149,9 @@ export async function clearAndWriteSheet(
     // Depois, escreve cabeçalhos e dados
     const allRows = [headers, ...data];
     await writeSheetData(accessToken, spreadsheetId, { sheetName }, allRows, false);
+    console.log(`✅ ${sheetName}: ${data.length} registros salvos com sucesso`);
   } catch (error) {
-    console.error('Erro ao limpar e reescrever planilha:', error);
+    console.error(`❌ Erro ao limpar e reescrever planilha ${sheetName}:`, error);
     throw error;
   }
 }
