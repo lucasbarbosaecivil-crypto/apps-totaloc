@@ -114,12 +114,34 @@ export function useSheetsSync(): UseSheetsSyncReturn {
       await sheetsSyncService.syncAll(accessToken, spreadsheetId, data);
       setLastSync(new Date());
     } catch (error: any) {
-      setSyncError(error.message || 'Erro ao sincronizar');
+      const errorMsg = error.message || 'Erro ao sincronizar';
+      console.error('❌ Erro ao sincronizar dados:', error);
+      
+      // 🚨 TRATAMENTO DE ERRO 401 (Token Expirado) 🚨
+      // Se o erro for 401 (Token Vencido/Inválido) ou qualquer erro de autenticação
+      if (
+        errorMsg.includes('401') || 
+        errorMsg.includes('Unauthorized') || 
+        errorMsg.includes('invalid authentication') || 
+        errorMsg.includes('credentials') ||
+        errorMsg.includes('invalid_grant') ||
+        errorMsg.includes('Token expired') ||
+        errorMsg.includes('token expired')
+      ) {
+        console.warn('🔒 Token expirado ou inválido durante sincronização. Desconectando automaticamente...');
+        // Limpa tudo e força o usuário a logar de novo
+        disconnect();
+        setSyncError('Sessão expirada. Por favor, faça login novamente.');
+        // Não relança o erro para evitar que o auto-sync continue tentando
+        return;
+      }
+      
+      setSyncError(errorMsg);
       throw error;
     } finally {
       setIsSyncing(false);
     }
-  }, [isAuthenticated, accessToken, spreadsheetId]);
+  }, [isAuthenticated, accessToken, spreadsheetId, disconnect]);
 
   const loadAll = useCallback(async () => {
     if (!isAuthenticated || !accessToken) {
@@ -154,16 +176,30 @@ export function useSheetsSync(): UseSheetsSyncReturn {
       const errorMsg = error.message || 'Erro ao carregar dados';
       console.error('❌ Erro ao carregar dados do Sheets:', error);
       
-      // Mensagens de erro mais específicas
+      // 🚨 TRATAMENTO DE ERRO 401 (Token Expirado) 🚨
+      // Se o erro for 401 (Token Vencido/Inválido) ou qualquer erro de autenticação
+      if (
+        errorMsg.includes('401') || 
+        errorMsg.includes('Unauthorized') || 
+        errorMsg.includes('invalid authentication') || 
+        errorMsg.includes('credentials') ||
+        errorMsg.includes('invalid_grant') ||
+        errorMsg.includes('Token expired') ||
+        errorMsg.includes('token expired')
+      ) {
+        console.warn('🔒 Token expirado ou inválido. Desconectando automaticamente...');
+        // Limpa tudo e força o usuário a logar de novo
+        disconnect();
+        setSyncError('Sessão expirada. Por favor, faça login novamente.');
+        return null;
+      }
+      
+      // Mensagens de erro mais específicas para outros erros
       let userFriendlyError = errorMsg;
       if (errorMsg.includes('404')) {
         userFriendlyError = 'Planilha não encontrada. Verifique o ID da planilha.';
       } else if (errorMsg.includes('403') || errorMsg.includes('permission')) {
         userFriendlyError = 'Sem permissão para acessar a planilha. Verifique as permissões do Google OAuth.';
-      } else if (errorMsg.includes('401') || errorMsg.includes('Unauthorized')) {
-        userFriendlyError = 'Token expirado. Faça login novamente.';
-        // Limpa token inválido
-        disconnect();
       } else if (errorMsg.includes('fetch')) {
         userFriendlyError = 'Erro de conexão. Verifique sua conexão com a internet.';
       }

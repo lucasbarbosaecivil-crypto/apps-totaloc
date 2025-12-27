@@ -160,7 +160,17 @@ export class SheetsSyncService {
     try {
       await ensureSheetExists(accessToken, spreadsheetId, 'EQUIPAMENTOS');
       const rows = data.map(equipamentoToRow);
+      
+      // Debug: Log dos dados sendo salvos (primeiros 3 equipamentos)
+      console.log('💾 Salvando equipamentos na planilha:');
+      console.log('📋 Headers:', EQUIPAMENTOS_HEADERS);
+      if (rows.length > 0) {
+        console.log('📦 Primeira linha de dados:', rows[0]);
+        console.log('💰 Valor_Diaria (posição 5):', rows[0][5], 'Tipo:', typeof rows[0][5]);
+      }
+      
       await clearAndWriteSheet(accessToken, spreadsheetId, 'EQUIPAMENTOS', EQUIPAMENTOS_HEADERS, rows);
+      console.log(`✅ ${data.length} equipamentos salvos com sucesso na planilha`);
       this.syncStatus.lastSync = new Date();
       this.syncStatus.error = null;
     } catch (error: any) {

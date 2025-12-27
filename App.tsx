@@ -753,11 +753,16 @@ const App: React.FC = () => {
       // Verifica se já foi adicionado
       if (newOS.items.some(i => i.stockItemId === selectedStockId)) return;
 
+      // Garantir que valorNoContrato seja sempre um número válido
+      const valorNoContrato = (availableItem.equipment.valorUnitario !== undefined && availableItem.equipment.valorUnitario !== null)
+        ? Number(availableItem.equipment.valorUnitario)
+        : 0;
+
     setNewOS({
       ...newOS,
       items: [...newOS.items, { 
         stockItemId: selectedStockId, 
-        valorNoContrato: availableItem.equipment.valorUnitario,
+        valorNoContrato: valorNoContrato, // Valor validado
         unidade: availableItem.equipment.unidade, // Inclui a unidade do equipamento
         dataInicio: today,
         dataFimPrevista: nextWeek
@@ -770,6 +775,12 @@ const App: React.FC = () => {
       const availableItem = availableStock.find(item => item.equipment.id === selectedEquipmentModelId && item.tipo === 'quantidade');
       if (!availableItem || selectedQuantity > availableItem.disponivel) return;
 
+      // Garantir que quantidade e valorNoContrato sejam sempre números válidos
+      const quantidade = Number(selectedQuantity) || 1;
+      const valorNoContrato = (availableItem.equipment.valorUnitario !== undefined && availableItem.equipment.valorUnitario !== null)
+        ? Number(availableItem.equipment.valorUnitario)
+        : 0;
+
       // Verifica se já foi adicionado este modelo (combina se já existir)
       const existingItem = newOS.items.find(i => 
         i.equipmentModelId === selectedEquipmentModelId && 
@@ -778,14 +789,19 @@ const App: React.FC = () => {
       );
 
       if (existingItem) {
-        // Atualiza quantidade existente
+        // Atualiza quantidade existente (garantir que seja número válido)
+        const quantidadeExistente = (existingItem.quantidade !== undefined && existingItem.quantidade !== null)
+          ? Number(existingItem.quantidade)
+          : 1;
+        const novaQuantidade = quantidadeExistente + quantidade;
+        
         setNewOS({
           ...newOS,
           items: newOS.items.map(i => 
             i.equipmentModelId === selectedEquipmentModelId && 
             i.dataInicio === today && 
             i.dataFimPrevista === nextWeek
-              ? { ...i, quantidade: (i.quantidade || 1) + selectedQuantity }
+              ? { ...i, quantidade: novaQuantidade } // Valor validado
               : i
           )
         });
@@ -795,8 +811,8 @@ const App: React.FC = () => {
         ...newOS,
         items: [...newOS.items, { 
           equipmentModelId: selectedEquipmentModelId,
-          quantidade: selectedQuantity,
-          valorNoContrato: availableItem.equipment.valorUnitario,
+          quantidade: quantidade, // Valor validado
+          valorNoContrato: valorNoContrato, // Valor validado
           unidade: availableItem.equipment.unidade, // Inclui a unidade do equipamento
           dataInicio: today,
           dataFimPrevista: nextWeek
@@ -872,6 +888,15 @@ const App: React.FC = () => {
   const handleCreateOS = () => {
     if (!newOS.clientId || newOS.items.length === 0) return;
     
+    // Garantir que valores numéricos sejam sempre números válidos
+    const descontoManual = (newOS.descontoManual !== undefined && newOS.descontoManual !== null)
+      ? Number(newOS.descontoManual)
+      : 0;
+    
+    const valorTotalPrevisto = (totalOSPrevisto !== undefined && totalOSPrevisto !== null)
+      ? Number(totalOSPrevisto)
+      : 0;
+    
     if (editingOSId) {
       // Modo edição
       setOrders(orders.map(os => 
@@ -880,8 +905,8 @@ const App: React.FC = () => {
               ...os,
               clientId: newOS.clientId,
               items: [...newOS.items],
-              descontoManual: newOS.descontoManual,
-              valorTotalPrevisto: totalOSPrevisto
+              descontoManual: descontoManual, // Valor validado
+              valorTotalPrevisto: valorTotalPrevisto // Valor validado
             }
           : os
       ));
@@ -893,9 +918,9 @@ const App: React.FC = () => {
         id: 'OS-' + Math.floor(1000 + Math.random() * 9000),
         clientId: newOS.clientId,
         items: [...newOS.items],
-        descontoManual: newOS.descontoManual,
+        descontoManual: descontoManual, // Valor validado
         status: OSStatus.ATIVO,
-        valorTotalPrevisto: totalOSPrevisto
+        valorTotalPrevisto: valorTotalPrevisto // Valor validado
       };
 
       setOrders([...orders, os]);
@@ -921,6 +946,11 @@ const App: React.FC = () => {
       return;
     }
 
+    // Garantir que descontoManualFinalizacao seja sempre um número válido
+    const descontoManual = (descontoManualFinalizacao !== undefined && descontoManualFinalizacao !== null)
+      ? Number(descontoManualFinalizacao)
+      : 0;
+
     let updatedOS: ServiceOrder | null = null;
 
     setOrders(prevOrders => prevOrders.map(os => {
@@ -929,13 +959,14 @@ const App: React.FC = () => {
         const realTotal = updatedItems.reduce((acc, item) => {
           const itemWithCompletion = { ...item, dataDevolucaoReal: dataConclusao };
           return acc + calculateItemCost(itemWithCompletion, true);
-        }, 0) - descontoManualFinalizacao;
+        }, 0) - descontoManual;
+        const valorTotalReal = Math.max(0, Number(realTotal)); // Garantir que seja número válido
         updatedOS = { 
           ...os, 
           status: OSStatus.FINALIZADO, 
           items: updatedItems,
-          descontoManual: descontoManualFinalizacao,
-          valorTotalReal: Math.max(0, realTotal),
+          descontoManual: descontoManual, // Valor validado
+          valorTotalReal: valorTotalReal, // Valor validado
           dataConclusao: dataConclusao
         };
         // Trigger PDF generation for the finalized OS
@@ -980,8 +1011,13 @@ const App: React.FC = () => {
   };
 
   const handleAddCatalog = () => {
-    if (!newCat.nome || !newCat.valorUnitario) {
-      toast.error('Preencha pelo menos nome e valor unitário');
+    // Garantir que valorUnitario seja sempre um número válido
+    const valorUnitario = (newCat.valorUnitario !== undefined && newCat.valorUnitario !== null)
+      ? Number(newCat.valorUnitario)
+      : 0;
+    
+    if (!newCat.nome || valorUnitario <= 0) {
+      toast.error('Preencha pelo menos nome e valor unitário válido');
       return;
     }
 
@@ -993,7 +1029,7 @@ const App: React.FC = () => {
               ...item,
               nome: newCat.nome!,
               descricao: newCat.descricao || '',
-              valorUnitario: newCat.valorUnitario || 0,
+              valorUnitario: valorUnitario, // Usa o valor convertido
               unidade: newCat.unidade || RentalUnit.DIARIA,
               foto: newCat.foto || undefined,
               numSerie: newCat.numSerie || undefined,
@@ -1006,10 +1042,10 @@ const App: React.FC = () => {
     } else {
       // Modo criação - sempre gera ID automaticamente
     const item: EquipmentModel = {
-        id: generateUniqueEquipmentId(),
+      id: generateUniqueEquipmentId(),
       nome: newCat.nome,
       descricao: newCat.descricao || '',
-        valorUnitario: newCat.valorUnitario || 0,
+        valorUnitario: valorUnitario, // Usa o valor convertido
       unidade: newCat.unidade || RentalUnit.DIARIA,
         foto: newCat.foto || undefined,
         numSerie: newCat.numSerie || undefined,
@@ -1098,6 +1134,11 @@ const App: React.FC = () => {
       return;
     }
 
+    // Garantir que valor seja sempre um número válido (0 se undefined/null)
+    const valor = (newRetirada.valor !== undefined && newRetirada.valor !== null)
+      ? Number(newRetirada.valor)
+      : 0;
+
     if (editingRetiradaId) {
       // Editar retirada existente
       setRetiradas(retiradas.map(r => 
@@ -1106,7 +1147,7 @@ const App: React.FC = () => {
               id: editingRetiradaId,
               dataRetirada: newRetirada.dataRetirada!,
               socioRetirada: newRetirada.socioRetirada!,
-              valor: parseFloat(newRetirada.valor?.toString() || '0') || 0
+              valor: valor // Valor validado
             }
           : r
       ));
@@ -1117,7 +1158,7 @@ const App: React.FC = () => {
         id: generateUniqueRetiradaId(),
         dataRetirada: newRetirada.dataRetirada!,
         socioRetirada: newRetirada.socioRetirada!,
-        valor: parseFloat(newRetirada.valor?.toString() || '0') || 0
+        valor: valor // Valor validado
       };
       setRetiradas([...retiradas, retirada]);
       toast.success('Retirada cadastrada com sucesso!');

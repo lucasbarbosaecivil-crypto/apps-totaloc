@@ -28,15 +28,25 @@ export const EQUIPAMENTOS_HEADERS = [
 ];
 
 export function equipamentoToRow(model: EquipmentModel): any[] {
+  // Garantir que valorUnitario seja sempre um número válido (0 se undefined/null)
+  const valorUnitario = (model.valorUnitario !== undefined && model.valorUnitario !== null) 
+    ? Number(model.valorUnitario) 
+    : 0;
+  
+  // Garantir que quantidade seja number ou vazio (string vazia se undefined/null)
+  const quantidade = (model.quantidade !== undefined && model.quantidade !== null)
+    ? Number(model.quantidade)
+    : '';
+  
   return [
     model.id,
     model.nome,
     model.descricao || '',
     model.foto || '',
     model.numSerie || '',
-    model.valorUnitario,
+    valorUnitario, // Sempre será um número válido
     model.unidade || 'Diária',
-    model.quantidade || '',
+    quantidade, // Number ou string vazia
   ];
 }
 
@@ -208,13 +218,27 @@ export const ORDENS_HEADERS = [
 ];
 
 export function ordemToRow(os: ServiceOrder): any[] {
+  // Garantir que valores numéricos sejam sempre números válidos
+  const descontoManual = (os.descontoManual !== undefined && os.descontoManual !== null)
+    ? Number(os.descontoManual)
+    : 0;
+  
+  const valorTotalPrevisto = (os.valorTotalPrevisto !== undefined && os.valorTotalPrevisto !== null)
+    ? Number(os.valorTotalPrevisto)
+    : 0;
+  
+  // valorTotalReal pode ser undefined (string vazia se não definido)
+  const valorTotalReal = (os.valorTotalReal !== undefined && os.valorTotalReal !== null)
+    ? Number(os.valorTotalReal)
+    : '';
+  
   return [
     os.id,
     os.clientId,
     os.status,
-    os.descontoManual || 0,
-    os.valorTotalPrevisto || 0,
-    os.valorTotalReal || '',
+    descontoManual, // Sempre será um número válido
+    valorTotalPrevisto, // Sempre será um número válido
+    valorTotalReal, // Number ou string vazia
     new Date().toISOString().split('T')[0],
   ];
 }
@@ -252,12 +276,22 @@ export const OS_ITENS_HEADERS = [
 ];
 
 export function osItemToRow(osId: string, item: OSItem): any[] {
+  // Garantir que quantidade seja number ou string vazia
+  const quantidade = (item.quantidade !== undefined && item.quantidade !== null)
+    ? Number(item.quantidade)
+    : '';
+  
+  // Garantir que valorNoContrato seja sempre um número válido
+  const valorNoContrato = (item.valorNoContrato !== undefined && item.valorNoContrato !== null)
+    ? Number(item.valorNoContrato)
+    : 0;
+  
   return [
     osId,
     item.stockItemId || '', // ID específico do item (se houver)
     item.equipmentModelId || '', // ID do modelo (se locação por quantidade)
-    item.quantidade || '', // Quantidade (se locação por quantidade)
-    item.valorNoContrato,
+    quantidade, // Number ou string vazia
+    valorNoContrato, // Sempre será um número válido
     item.dataInicio,
     item.dataFimPrevista,
     item.dataDevolucaoReal || '',
@@ -298,11 +332,16 @@ export const RETIRADAS_HEADERS = [
 ];
 
 export function retiradaToRow(r: Retirada): any[] {
+  // Garantir que valor seja sempre um número válido (0 se undefined/null)
+  const valor = (r.valor !== undefined && r.valor !== null)
+    ? Number(r.valor)
+    : 0;
+  
   return [
     r.id,
     r.dataRetirada,
     r.socioRetirada,
-    r.valor,
+    valor, // Sempre será um número válido
   ];
 }
 
