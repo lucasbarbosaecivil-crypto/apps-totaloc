@@ -203,68 +203,8 @@ const App: React.FC = () => {
     }
   };
 
-  // Gera lista base de estoque disponível (sem considerar newOS ainda - será ajustado depois)
-  const availableStockBase = useMemo(() => {
-    const items: Array<{
-      id: string;
-      equipment: EquipmentModel;
-      tipo: 'quantidade' | 'id';
-      disponivel: number;
-      total?: number;
-    }> = [];
-
-    // Processa todos os equipamentos cadastrados
-    catalogo.forEach(equipment => {
-      // Verifica se o equipamento tem controle por quantidade (quantidade definida e > 0)
-      const quantidadeValue = equipment.quantidade;
-      const hasQuantidade = quantidadeValue !== undefined && 
-                           quantidadeValue !== null && 
-                           (typeof quantidadeValue === 'number' ? quantidadeValue > 0 : false);
-      
-      if (hasQuantidade) {
-        // Equipamento com controle por quantidade
-        // Calcula quantidade disponível = quantidade total - quantidade locada - quantidade na OS atual
-        const locadaEmOSAtivas = activeOrders.reduce((total, os) => {
-          return total + os.items
-            .filter(item => item.equipmentModelId === equipment.id)
-            .reduce((sum, item) => sum + (item.quantidade || 1), 0);
-        }, 0);
-        
-        const locada = locadaEmOSAtivas;
-        const disponivel = equipment.quantidade - locada;
-        
-        if (disponivel > 0) {
-          items.push({
-            id: equipment.id,
-            equipment,
-            tipo: 'quantidade',
-            disponivel,
-            total: equipment.quantidade,
-          });
-        }
-      } else {
-        // Equipamento sem quantidade (controle por ID)
-        // Verifica se está locado em alguma OS ativa ou na OS atual
-        const isLocadoEmOSAtivas = activeOrders.some(os => 
-          os.items.some(item => item.equipmentModelId === equipment.id)
-        );
-        
-        // Se não está locado, mostra como disponível
-        if (!isLocadoEmOSAtivas) {
-          items.push({
-            id: equipment.id,
-            equipment,
-            tipo: 'id',
-            disponivel: 1,
-          });
-        }
-      }
-    });
-
-    return items;
-  }, [catalogo, activeOrders]);
-
   // --- Financial Calculations ---
+  // Declara calculateItemCost ANTES de usar em useMemo para evitar problemas de inicialização
   const calculateItemCost = (item: OSItem, isReal: boolean = false) => {
     const start = new Date(item.dataInicio);
     const end = isReal && item.dataDevolucaoReal ? new Date(item.dataDevolucaoReal) : new Date(item.dataFimPrevista);
@@ -504,6 +444,67 @@ const App: React.FC = () => {
     valor: 0
   });
   const [editingRetiradaId, setEditingRetiradaId] = useState<string | null>(null);
+
+  // Gera lista base de estoque disponível (sem considerar newOS ainda - será ajustado depois)
+  const availableStockBase = useMemo(() => {
+    const items: Array<{
+      id: string;
+      equipment: EquipmentModel;
+      tipo: 'quantidade' | 'id';
+      disponivel: number;
+      total?: number;
+    }> = [];
+
+    // Processa todos os equipamentos cadastrados
+    catalogo.forEach(equipment => {
+      // Verifica se o equipamento tem controle por quantidade (quantidade definida e > 0)
+      const quantidadeValue = equipment.quantidade;
+      const hasQuantidade = quantidadeValue !== undefined && 
+                           quantidadeValue !== null && 
+                           (typeof quantidadeValue === 'number' ? quantidadeValue > 0 : false);
+      
+      if (hasQuantidade) {
+        // Equipamento com controle por quantidade
+        // Calcula quantidade disponível = quantidade total - quantidade locada - quantidade na OS atual
+        const locadaEmOSAtivas = activeOrders.reduce((total, os) => {
+          return total + os.items
+            .filter(item => item.equipmentModelId === equipment.id)
+            .reduce((sum, item) => sum + (item.quantidade || 1), 0);
+        }, 0);
+        
+        const locada = locadaEmOSAtivas;
+        const disponivel = equipment.quantidade - locada;
+        
+        if (disponivel > 0) {
+          items.push({
+            id: equipment.id,
+            equipment,
+            tipo: 'quantidade',
+            disponivel,
+            total: equipment.quantidade,
+          });
+        }
+      } else {
+        // Equipamento sem quantidade (controle por ID)
+        // Verifica se está locado em alguma OS ativa ou na OS atual
+        const isLocadoEmOSAtivas = activeOrders.some(os => 
+          os.items.some(item => item.equipmentModelId === equipment.id)
+        );
+        
+        // Se não está locado, mostra como disponível
+        if (!isLocadoEmOSAtivas) {
+          items.push({
+            id: equipment.id,
+            equipment,
+            tipo: 'id',
+            disponivel: 1,
+          });
+        }
+      }
+    });
+
+    return items;
+  }, [catalogo, activeOrders]);
 
   // Calcula estoque disponível considerando também itens em newOS (OS sendo criada)
   const availableStock = useMemo(() => {
