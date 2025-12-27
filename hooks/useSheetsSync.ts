@@ -6,6 +6,7 @@ import {
   Client,
   ServiceOrder,
   Retirada,
+  Despesa,
 } from '../types';
 
 interface UseSheetsSyncReturn {
@@ -26,6 +27,7 @@ interface UseSheetsSyncReturn {
     clients: Client[];
     orders: ServiceOrder[];
     retiradas: Retirada[];
+    despesas: Despesa[];
   }) => Promise<void>;
   loadAll: () => Promise<{
     catalogo: EquipmentModel[];
@@ -33,6 +35,7 @@ interface UseSheetsSyncReturn {
     clients: Client[];
     orders: ServiceOrder[];
     retiradas: Retirada[];
+    despesas: Despesa[];
   } | null>;
   setSpreadsheetId: (id: string) => void;
 }
@@ -101,6 +104,7 @@ export function useSheetsSync(): UseSheetsSyncReturn {
     clients: Client[];
     orders: ServiceOrder[];
     retiradas: Retirada[];
+    despesas: Despesa[];
   }) => {
     if (!isAuthenticated || !accessToken) {
       throw new Error('Não autenticado. Faça login com Google primeiro.');
@@ -163,6 +167,7 @@ export function useSheetsSync(): UseSheetsSyncReturn {
         console.log(`   - Clientes: ${data.clients.length}`);
         console.log(`   - Ordens: ${data.orders.length}`);
         console.log(`   - Retiradas: ${data.retiradas?.length || 0}`);
+        console.log(`   - Despesas: ${data.despesas?.length || 0}`);
         
         if (data.catalogo.length === 0) {
           console.warn('⚠️ Nenhum equipamento foi carregado. Verifique se a aba EQUIPAMENTOS possui dados.');

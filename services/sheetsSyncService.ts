@@ -10,6 +10,7 @@ import {
   Client,
   ServiceOrder,
   Retirada,
+  Despesa,
 } from '../types';
 import {
   readSheetData,
@@ -38,6 +39,10 @@ import {
   RETIRADAS_HEADERS,
   retiradaToRow,
   rowToRetirada,
+  // Despesas
+  DESPESAS_HEADERS,
+  despesaToRow,
+  rowToDespesa,
 } from './sheetsMappers';
 
 export interface SyncStatus {
@@ -74,6 +79,7 @@ export class SheetsSyncService {
       ensureSheetExists(accessToken, spreadsheetId, 'ORDENS_SERVICO'),
       ensureSheetExists(accessToken, spreadsheetId, 'OS_ITENS'),
       ensureSheetExists(accessToken, spreadsheetId, 'RETIRADAS'),
+      ensureSheetExists(accessToken, spreadsheetId, 'DESPESAS'),
     ]);
   }
 
@@ -355,6 +361,7 @@ export class SheetsSyncService {
       clients: Client[];
       orders: ServiceOrder[];
       retiradas: Retirada[];
+      despesas: Despesa[];
     }
   ): Promise<void> {
     // 🛡️ PROTEÇÃO CRÍTICA: Verifica se há dados antes de sincronizar
@@ -364,7 +371,8 @@ export class SheetsSyncService {
       (data.catalogo && data.catalogo.length > 0) ||
       (data.clients && data.clients.length > 0) ||
       (data.orders && data.orders.length > 0) ||
-      (data.retiradas && data.retiradas.length > 0);
+      (data.retiradas && data.retiradas.length > 0) ||
+      (data.despesas && data.despesas.length > 0);
 
     if (!hasAnyData) {
       const errorMsg = '🚨 BLOQUEADO: Tentativa de sincronizar dados vazios. Isso apagaria todos os dados da planilha. Carregue os dados primeiro!';
@@ -374,6 +382,7 @@ export class SheetsSyncService {
         clients: data.clients?.length || 0,
         orders: data.orders?.length || 0,
         retiradas: data.retiradas?.length || 0,
+        despesas: data.despesas?.length || 0,
       });
       throw new Error(errorMsg);
     }
@@ -383,6 +392,7 @@ export class SheetsSyncService {
       clientes: data.clients?.length || 0,
       ordens: data.orders?.length || 0,
       retiradas: data.retiradas?.length || 0,
+      despesas: data.despesas?.length || 0,
     });
 
     // Salva cada categoria, mas as funções save* individuais vão ignorar silenciosamente se estiverem vazias
@@ -407,6 +417,10 @@ export class SheetsSyncService {
       promises.push(this.saveRetiradas(accessToken, spreadsheetId, data.retiradas));
     }
 
+    if (data.despesas && data.despesas.length > 0) {
+      promises.push(this.saveDespesas(accessToken, spreadsheetId, data.despesas));
+    }
+
     await Promise.all(promises);
   }
 
@@ -416,16 +430,18 @@ export class SheetsSyncService {
     clients: Client[];
     orders: ServiceOrder[];
     retiradas: Retirada[];
+    despesas: Despesa[];
   }> {
-    const [catalogo, clients, orders, retiradas] = await Promise.all([
+    const [catalogo, clients, orders, retiradas, despesas] = await Promise.all([
       this.loadEquipamentos(accessToken, spreadsheetId),
       this.loadClientes(accessToken, spreadsheetId),
       this.loadOrdens(accessToken, spreadsheetId),
       this.loadRetiradas(accessToken, spreadsheetId),
+      this.loadDespesas(accessToken, spreadsheetId),
     ]);
 
     // Estoque não é mais carregado do Sheets - é calculado dinamicamente
-    return { catalogo, stock: [], clients, orders, retiradas };
+    return { catalogo, stock: [], clients, orders, retiradas, despesas };
   }
 }
 

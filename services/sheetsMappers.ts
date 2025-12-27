@@ -12,6 +12,7 @@ import {
   OSStatus,
   DocumentType,
   Retirada,
+  Despesa,
 } from '../types';
 
 // ==================== EQUIPAMENTOS (Catálogo) ====================
@@ -359,3 +360,42 @@ export function rowToRetirada(row: any[], headers: string[]): Retirada {
   };
 }
 
+// ==================== DESPESAS ====================
+
+export const DESPESAS_HEADERS = [
+  'ID_Despesa',
+  'Data',
+  'Agrupador',
+  'Descricao',
+  'Valor',
+];
+
+export function despesaToRow(d: Despesa): any[] {
+  // Garantir que valor seja sempre um número válido (0 se undefined/null)
+  const valor = (d.valor !== undefined && d.valor !== null)
+    ? Number(d.valor)
+    : 0;
+  
+  return [
+    d.id,
+    d.data,
+    d.agrupador,
+    d.descricao,
+    valor, // Sempre será um número válido
+  ];
+}
+
+export function rowToDespesa(row: any[], headers: string[]): Despesa {
+  const getCol = (colName: string) => {
+    const idx = headers.indexOf(colName);
+    return idx >= 0 ? row[idx] : '';
+  };
+
+  return {
+    id: getCol('ID_Despesa') || '',
+    data: getCol('Data') || '',
+    agrupador: getCol('Agrupador') || '',
+    descricao: getCol('Descricao') || '',
+    valor: parseFloat(getCol('Valor')) || 0,
+  };
+}

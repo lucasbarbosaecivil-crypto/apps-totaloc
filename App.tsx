@@ -140,7 +140,8 @@ const App: React.FC = () => {
           stock,
           clients,
           orders,
-          retiradas
+          retiradas,
+          despesas
         });
       } catch (err: any) {
         console.error('Erro ao sincronizar (auto-save):', err);
@@ -148,7 +149,7 @@ const App: React.FC = () => {
     }, 5000); // Aumentei para 5s para evitar muitas chamadas
 
     return () => clearTimeout(timeoutId);
-  }, [catalogo, stock, clients, orders, retiradas, isAuthenticated, accessToken, syncAll, dataLoaded]);
+  }, [catalogo, stock, clients, orders, retiradas, despesas, isAuthenticated, accessToken, syncAll, dataLoaded]);
 
   // --- Derived Logic ---
   const activeOrders = useMemo(() => orders.filter(os => os.status === OSStatus.ATIVO), [orders]);
@@ -878,14 +879,33 @@ const App: React.FC = () => {
     setIsModalOpen('os');
   };
 
-  const handleDeleteOS = (id: string) => {
+  const handleDeleteOS = async (id: string) => {
     if (window.confirm('Tem certeza que deseja excluir esta locação? Esta ação não pode ser desfeita.')) {
-      setOrders(orders.filter(os => os.id !== id));
+      const updatedOrders = orders.filter(os => os.id !== id);
+      setOrders(updatedOrders);
       toast.success('Locação excluída com sucesso!');
+      
+      // 💾 Sincronização imediata com Google Sheets após excluir
+      if (isAuthenticated && accessToken && dataLoaded) {
+        try {
+          await syncAll({
+            catalogo,
+            stock,
+            clients,
+            orders: updatedOrders,
+            retiradas,
+            despesas
+          });
+          console.log('✅ Locação removida e sincronizada com Google Sheets');
+        } catch (err: any) {
+          console.error('❌ Erro ao sincronizar exclusão:', err);
+          toast.error('Locação excluída localmente, mas houve erro ao sincronizar com Google Sheets');
+        }
+      }
     }
   };
 
-  const handleCreateOS = () => {
+  const handleCreateOS = async () => {
     if (!newOS.clientId || newOS.items.length === 0) return;
     
     // Garantir que valores numéricos sejam sempre números válidos
@@ -897,9 +917,10 @@ const App: React.FC = () => {
       ? Number(totalOSPrevisto)
       : 0;
     
+    let updatedOrders: ServiceOrder[];
     if (editingOSId) {
       // Modo edição
-      setOrders(orders.map(os => 
+      updatedOrders = orders.map(os => 
         os.id === editingOSId 
           ? {
               ...os,
@@ -909,7 +930,8 @@ const App: React.FC = () => {
               valorTotalPrevisto: valorTotalPrevisto // Valor validado
             }
           : os
-      ));
+      );
+      setOrders(updatedOrders);
       toast.success('Locação atualizada com sucesso!');
       setEditingOSId(null);
     } else {
@@ -923,8 +945,26 @@ const App: React.FC = () => {
         valorTotalPrevisto: valorTotalPrevisto // Valor validado
       };
 
-      setOrders([...orders, os]);
+      updatedOrders = [...orders, os];
+      setOrders(updatedOrders);
       toast.success('Locação criada com sucesso!');
+    }
+
+    // 💾 Sincronização imediata com Google Sheets após salvar
+    if (isAuthenticated && accessToken && dataLoaded) {
+      try {
+        await syncAll({
+          catalogo,
+          stock,
+          clients,
+          orders: updatedOrders,
+          retiradas
+        });
+        console.log('✅ Locação sincronizada com Google Sheets');
+      } catch (err: any) {
+        console.error('❌ Erro ao sincronizar locação:', err);
+        toast.error('Locação salva localmente, mas houve erro ao sincronizar com Google Sheets');
+      }
     }
 
     setIsModalOpen(null);
@@ -940,7 +980,7 @@ const App: React.FC = () => {
     setIsModalOpen('finish-os');
   };
 
-  const finishOS = () => {
+  const finishOS = async () => {
     if (!finishingOSId || !dataConclusao) {
       toast.error('Informe a data de conclusão');
       return;
@@ -952,30 +992,54 @@ const App: React.FC = () => {
       : 0;
 
     let updatedOS: ServiceOrder | null = null;
+    let updatedOrders: ServiceOrder[] = [];
 
-    setOrders(prevOrders => prevOrders.map(os => {
-      if (os.id === finishingOSId) {
-        const updatedItems = os.items.map(item => ({ ...item, dataDevolucaoReal: dataConclusao }));
-        const realTotal = updatedItems.reduce((acc, item) => {
-          const itemWithCompletion = { ...item, dataDevolucaoReal: dataConclusao };
-          return acc + calculateItemCost(itemWithCompletion, true);
-        }, 0) - descontoManual;
-        const valorTotalReal = Math.max(0, Number(realTotal)); // Garantir que seja número válido
-        updatedOS = { 
-          ...os, 
-          status: OSStatus.FINALIZADO, 
-          items: updatedItems,
-          descontoManual: descontoManual, // Valor validado
-          valorTotalReal: valorTotalReal, // Valor validado
-          dataConclusao: dataConclusao
-        };
-        // Trigger PDF generation for the finalized OS
-        setTimeout(() => updatedOS && generateOSPDF(updatedOS), 500);
-        toast.success('Ordem de serviço finalizada com sucesso!');
-        return updatedOS;
+    setOrders(prevOrders => {
+      updatedOrders = prevOrders.map(os => {
+        if (os.id === finishingOSId) {
+          const updatedItems = os.items.map(item => ({ ...item, dataDevolucaoReal: dataConclusao }));
+          const realTotal = updatedItems.reduce((acc, item) => {
+            const itemWithCompletion = { ...item, dataDevolucaoReal: dataConclusao };
+            return acc + calculateItemCost(itemWithCompletion, true);
+          }, 0) - descontoManual;
+          const valorTotalReal = Math.max(0, Number(realTotal)); // Garantir que seja número válido
+          updatedOS = { 
+            ...os, 
+            status: OSStatus.FINALIZADO, 
+            items: updatedItems,
+            descontoManual: descontoManual, // Valor validado
+            valorTotalReal: valorTotalReal, // Valor validado
+            dataConclusao: dataConclusao
+          };
+          return updatedOS;
+        }
+        return os;
+      });
+      return updatedOrders;
+    });
+
+    // Trigger PDF generation for the finalized OS
+    if (updatedOS) {
+      setTimeout(() => generateOSPDF(updatedOS!), 500);
+    }
+    toast.success('Ordem de serviço finalizada com sucesso!');
+
+    // 💾 Sincronização imediata com Google Sheets após finalizar
+    if (isAuthenticated && accessToken && dataLoaded) {
+      try {
+        await syncAll({
+          catalogo,
+          stock,
+          clients,
+          orders: updatedOrders,
+          retiradas
+        });
+        console.log('✅ Ordem finalizada e sincronizada com Google Sheets');
+      } catch (err: any) {
+        console.error('❌ Erro ao sincronizar finalização:', err);
+        toast.error('Ordem finalizada localmente, mas houve erro ao sincronizar com Google Sheets');
       }
-      return os;
-    }));
+    }
 
     setIsModalOpen(null);
     setFinishingOSId(null);
@@ -1013,13 +1077,14 @@ const App: React.FC = () => {
       // 💾 Sincronização imediata com Google Sheets após excluir
       if (isAuthenticated && accessToken && dataLoaded) {
         try {
-          await syncAll({
-            catalogo: updatedCatalogo,
-            stock: updatedStock,
-            clients,
-            orders,
-            retiradas
-          });
+        await syncAll({
+          catalogo: updatedCatalogo,
+          stock: updatedStock,
+          clients,
+          orders,
+          retiradas,
+          despesas
+        });
           console.log('✅ Equipamento removido e sincronizado com Google Sheets');
         } catch (err: any) {
           console.error('❌ Erro ao sincronizar exclusão:', err);
@@ -1084,7 +1149,8 @@ const App: React.FC = () => {
           stock,
           clients,
           orders,
-          retiradas
+          retiradas,
+          despesas
         });
         console.log('✅ Equipamento sincronizado com Google Sheets');
       } catch (err: any) {
@@ -1159,14 +1225,33 @@ const App: React.FC = () => {
   };
 
   // Função para excluir retirada
-  const handleDeleteRetirada = (id: string) => {
+  const handleDeleteRetirada = async (id: string) => {
     if (window.confirm('Tem certeza que deseja excluir esta retirada?')) {
-      setRetiradas(retiradas.filter(r => r.id !== id));
+      const updatedRetiradas = retiradas.filter(r => r.id !== id);
+      setRetiradas(updatedRetiradas);
       toast.success('Retirada excluída com sucesso!');
+      
+      // 💾 Sincronização imediata com Google Sheets após excluir
+      if (isAuthenticated && accessToken && dataLoaded) {
+        try {
+          await syncAll({
+            catalogo,
+            stock,
+            clients,
+            orders,
+            retiradas: updatedRetiradas,
+            despesas
+          });
+          console.log('✅ Retirada removida e sincronizada com Google Sheets');
+        } catch (err: any) {
+          console.error('❌ Erro ao sincronizar exclusão:', err);
+          toast.error('Retirada excluída localmente, mas houve erro ao sincronizar com Google Sheets');
+        }
+      }
     }
   };
 
-  const handleAddRetirada = () => {
+  const handleAddRetirada = async () => {
     if (!newRetirada.dataRetirada || !newRetirada.socioRetirada || !newRetirada.valor) {
       toast.error('Preencha todos os campos obrigatórios');
       return;
@@ -1177,9 +1262,10 @@ const App: React.FC = () => {
       ? Number(newRetirada.valor)
       : 0;
 
+    let updatedRetiradas: Retirada[];
     if (editingRetiradaId) {
       // Editar retirada existente
-      setRetiradas(retiradas.map(r => 
+      updatedRetiradas = retiradas.map(r => 
         r.id === editingRetiradaId 
           ? {
               id: editingRetiradaId,
@@ -1188,7 +1274,8 @@ const App: React.FC = () => {
               valor: valor // Valor validado
             }
           : r
-      ));
+      );
+      setRetiradas(updatedRetiradas);
       toast.success('Retirada atualizada com sucesso!');
     } else {
       // Adicionar nova retirada
@@ -1198,8 +1285,26 @@ const App: React.FC = () => {
         socioRetirada: newRetirada.socioRetirada!,
         valor: valor // Valor validado
       };
-      setRetiradas([...retiradas, retirada]);
+      updatedRetiradas = [...retiradas, retirada];
+      setRetiradas(updatedRetiradas);
       toast.success('Retirada cadastrada com sucesso!');
+    }
+
+    // 💾 Sincronização imediata com Google Sheets após salvar
+    if (isAuthenticated && accessToken && dataLoaded) {
+      try {
+        await syncAll({
+          catalogo,
+          stock,
+          clients,
+          orders,
+          retiradas: updatedRetiradas
+        });
+        console.log('✅ Retirada sincronizada com Google Sheets');
+      } catch (err: any) {
+        console.error('❌ Erro ao sincronizar retirada:', err);
+        toast.error('Retirada salva localmente, mas houve erro ao sincronizar com Google Sheets');
+      }
     }
 
     setNewRetirada({
@@ -1212,32 +1317,58 @@ const App: React.FC = () => {
   };
 
   // Função para excluir despesa
-  const handleDeleteDespesa = (id: string) => {
+  const handleDeleteDespesa = async (id: string) => {
     if (window.confirm('Tem certeza que deseja excluir esta despesa?')) {
-      setDespesas(despesas.filter(d => d.id !== id));
+      const updatedDespesas = despesas.filter(d => d.id !== id);
+      setDespesas(updatedDespesas);
       toast.success('Despesa excluída com sucesso!');
+      
+      // 💾 Sincronização imediata com Google Sheets após excluir
+      if (isAuthenticated && accessToken && dataLoaded) {
+        try {
+          await syncAll({
+            catalogo,
+            stock,
+            clients,
+            orders,
+            retiradas,
+            despesas: updatedDespesas
+          });
+          console.log('✅ Despesa removida e sincronizada com Google Sheets');
+        } catch (err: any) {
+          console.error('❌ Erro ao sincronizar exclusão:', err);
+          toast.error('Despesa excluída localmente, mas houve erro ao sincronizar com Google Sheets');
+        }
+      }
     }
   };
 
-  const handleAddDespesa = () => {
+  const handleAddDespesa = async () => {
     if (!newDespesa.data || !newDespesa.agrupador || !newDespesa.descricao || !newDespesa.valor) {
       toast.error('Preencha todos os campos obrigatórios');
       return;
     }
 
+    // Garantir que valor seja sempre um número válido
+    const valor = (newDespesa.valor !== undefined && newDespesa.valor !== null)
+      ? Number(newDespesa.valor)
+      : 0;
+
+    let updatedDespesas: Despesa[];
     if (editingDespesaId) {
       // Editar despesa existente
-      setDespesas(despesas.map(d => 
+      updatedDespesas = despesas.map(d => 
         d.id === editingDespesaId 
           ? {
               id: editingDespesaId,
               data: newDespesa.data!,
               agrupador: newDespesa.agrupador!,
               descricao: newDespesa.descricao!,
-              valor: parseFloat(newDespesa.valor?.toString() || '0') || 0
+              valor: valor // Valor validado
             }
           : d
-      ));
+      );
+      setDespesas(updatedDespesas);
       toast.success('Despesa atualizada com sucesso!');
     } else {
       // Adicionar nova despesa
@@ -1246,10 +1377,29 @@ const App: React.FC = () => {
         data: newDespesa.data!,
         agrupador: newDespesa.agrupador!,
         descricao: newDespesa.descricao!,
-        valor: parseFloat(newDespesa.valor?.toString() || '0') || 0
+        valor: valor // Valor validado
       };
-      setDespesas([...despesas, despesa]);
+      updatedDespesas = [...despesas, despesa];
+      setDespesas(updatedDespesas);
       toast.success('Despesa cadastrada com sucesso!');
+    }
+
+    // 💾 Sincronização imediata com Google Sheets após salvar
+    if (isAuthenticated && accessToken && dataLoaded) {
+      try {
+        await syncAll({
+          catalogo,
+          stock,
+          clients,
+          orders,
+          retiradas,
+          despesas: updatedDespesas
+        });
+        console.log('✅ Despesa sincronizada com Google Sheets');
+      } catch (err: any) {
+        console.error('❌ Erro ao sincronizar despesa:', err);
+        toast.error('Despesa salva localmente, mas houve erro ao sincronizar com Google Sheets');
+      }
     }
 
     setNewDespesa({
@@ -1262,7 +1412,7 @@ const App: React.FC = () => {
     setIsModalOpen(null);
   };
 
-  const handleDeleteClient = (id: string) => {
+  const handleDeleteClient = async (id: string) => {
     // Verificar se o cliente está sendo usado em alguma locação ativa
     const hasActiveOrders = activeOrders.some(os => os.clientId === id);
     
@@ -1272,20 +1422,40 @@ const App: React.FC = () => {
     }
 
     if (window.confirm('Tem certeza que deseja excluir este cliente? Esta ação não pode ser desfeita.')) {
-      setClients(clients.filter(c => c.id !== id));
+      const updatedClients = clients.filter(c => c.id !== id);
+      setClients(updatedClients);
       toast.success('Cliente excluído com sucesso!');
+      
+      // 💾 Sincronização imediata com Google Sheets após excluir
+      if (isAuthenticated && accessToken && dataLoaded) {
+        try {
+          await syncAll({
+            catalogo,
+            stock,
+            clients: updatedClients,
+            orders,
+            retiradas,
+            despesas
+          });
+          console.log('✅ Cliente removido e sincronizado com Google Sheets');
+        } catch (err: any) {
+          console.error('❌ Erro ao sincronizar exclusão:', err);
+          toast.error('Cliente excluído localmente, mas houve erro ao sincronizar com Google Sheets');
+        }
+      }
     }
   };
 
-  const handleAddClient = () => {
+  const handleAddClient = async () => {
     if (!newCli.nome || !newCli.telefone || !newCli.email) {
       toast.error('Preencha pelo menos nome, telefone e email');
       return;
     }
 
+    let updatedClients: Client[];
     if (editingCliId) {
       // Modo edição
-      const updatedClients = clients.map(item => 
+      updatedClients = clients.map(item => 
         item.id === editingCliId 
           ? {
               ...item,
@@ -1315,8 +1485,26 @@ const App: React.FC = () => {
         tipoDocumento: newCli.tipoDocumento,
         documento: newCli.documento?.replace(/\D/g, '') || undefined, // Salva apenas números
       };
-      setClients([...clients, client]);
+      updatedClients = [...clients, client];
+      setClients(updatedClients);
       toast.success('Cliente cadastrado com sucesso!');
+    }
+
+    // 💾 Sincronização imediata com Google Sheets após salvar
+    if (isAuthenticated && accessToken && dataLoaded) {
+      try {
+        await syncAll({
+          catalogo,
+          stock,
+          clients: updatedClients,
+          orders,
+          retiradas
+        });
+        console.log('✅ Cliente sincronizado com Google Sheets');
+      } catch (err: any) {
+        console.error('❌ Erro ao sincronizar cliente:', err);
+        toast.error('Cliente salvo localmente, mas houve erro ao sincronizar com Google Sheets');
+      }
     }
 
     setNewCli({ cidade: 'Presidente Olegário-MG' }); // Reset mantém cidade padrão
@@ -1384,6 +1572,7 @@ const App: React.FC = () => {
                   setClients(data.clients);
                   setOrders(data.orders);
                   setRetiradas(data.retiradas);
+                  setDespesas(data.despesas || []); // Carrega despesas do Google Sheets
                   // Estoque é calculado dinamicamente, não precisa setar se não vier
                   if(data.stock && data.stock.length > 0) setStock(data.stock);
                   
@@ -1391,7 +1580,7 @@ const App: React.FC = () => {
                   // Agora que os dados foram carregados com sucesso, é seguro permitir o auto-sync
                   setDataLoaded(true);
                   
-                  const totalItems = data.catalogo.length + data.clients.length + data.orders.length + (data.retiradas?.length || 0);
+                  const totalItems = data.catalogo.length + data.clients.length + data.orders.length + (data.retiradas?.length || 0) + (data.despesas?.length || 0);
                   const message = `Dados carregados com sucesso! (${totalItems} registros)`;
                   toast.success(message);
                   return { success: true, message };
