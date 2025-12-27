@@ -80,6 +80,10 @@ const App: React.FC = () => {
   const [dataConclusao, setDataConclusao] = useState<string>('');
   const [descontoManualFinalizacao, setDescontoManualFinalizacao] = useState<number>(0);
 
+  // 🔒 TRAVA DE SEGURANÇA: Controla se os dados já foram carregados pelo menos uma vez
+  // Começa como FALSE para evitar que o auto-sync salve dados vazios antes do carregamento
+  const [dataLoaded, setDataLoaded] = useState(false);
+
   // --- Toast Notifications ---
   const { toast, ToastComponent } = useToastContainer();
 
@@ -118,8 +122,14 @@ const App: React.FC = () => {
 
   // Auto-sync quando houver mudanças (com debounce melhorado)
   useEffect(() => {
-    // Só tenta sincronizar se estiver autenticado E tiver o token
-    if (!isAuthenticated || !accessToken) return;
+    // 🛑 TRAVA DE SEGURANÇA: PARE TUDO SE:
+    // 1. Não tiver token
+    // 2. OU se os dados ainda não foram carregados pela primeira vez (dataLoaded é false)
+    // Isso evita que o app salve arrays vazios na planilha antes de carregar os dados
+    if (!isAuthenticated || !accessToken || !dataLoaded) {
+      console.log('⏸️ Auto-sync bloqueado:', { isAuthenticated, hasToken: !!accessToken, dataLoaded });
+      return;
+    }
     
     const timeoutId = setTimeout(async () => {
       try {
@@ -138,7 +148,7 @@ const App: React.FC = () => {
     }, 5000); // Aumentei para 5s para evitar muitas chamadas
 
     return () => clearTimeout(timeoutId);
-  }, [catalogo, stock, clients, orders, retiradas, isAuthenticated, accessToken, syncAll]);
+  }, [catalogo, stock, clients, orders, retiradas, isAuthenticated, accessToken, syncAll, dataLoaded]);
 
   // --- Derived Logic ---
   const activeOrders = useMemo(() => orders.filter(os => os.status === OSStatus.ATIVO), [orders]);
@@ -1280,6 +1290,8 @@ const App: React.FC = () => {
             }}
             onDisconnect={() => {
               disconnect();
+              // Resetar dataLoaded quando desconectar para garantir que o próximo login requer carregamento manual
+              setDataLoaded(false);
               toast.success('Desconectado com sucesso!');
             }}
             onLoadFromSheets={async () => {
@@ -1295,6 +1307,10 @@ const App: React.FC = () => {
                   setRetiradas(data.retiradas);
                   // Estoque é calculado dinamicamente, não precisa setar se não vier
                   if(data.stock && data.stock.length > 0) setStock(data.stock);
+                  
+                  // ✅ LIBERA O SALVAMENTO AUTOMÁTICO
+                  // Agora que os dados foram carregados com sucesso, é seguro permitir o auto-sync
+                  setDataLoaded(true);
                   
                   const totalItems = data.catalogo.length + data.clients.length + data.orders.length + (data.retiradas?.length || 0);
                   const message = `Dados carregados com sucesso! (${totalItems} registros)`;
