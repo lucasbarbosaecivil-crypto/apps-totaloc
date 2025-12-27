@@ -992,31 +992,30 @@ const App: React.FC = () => {
       : 0;
 
     let updatedOS: ServiceOrder | null = null;
-    let updatedOrders: ServiceOrder[] = [];
 
-    setOrders(prevOrders => {
-      updatedOrders = prevOrders.map(os => {
-        if (os.id === finishingOSId) {
-          const updatedItems = os.items.map(item => ({ ...item, dataDevolucaoReal: dataConclusao }));
-          const realTotal = updatedItems.reduce((acc, item) => {
-            const itemWithCompletion = { ...item, dataDevolucaoReal: dataConclusao };
-            return acc + calculateItemCost(itemWithCompletion, true);
-          }, 0) - descontoManual;
-          const valorTotalReal = Math.max(0, Number(realTotal)); // Garantir que seja número válido
-          updatedOS = { 
-            ...os, 
-            status: OSStatus.FINALIZADO, 
-            items: updatedItems,
-            descontoManual: descontoManual, // Valor validado
-            valorTotalReal: valorTotalReal, // Valor validado
-            dataConclusao: dataConclusao
-          };
-          return updatedOS;
-        }
-        return os;
-      });
-      return updatedOrders;
+    // Usar uma função que retorna o estado atualizado de forma mais segura
+    const updatedOrders = orders.map(os => {
+      if (os.id === finishingOSId) {
+        const updatedItems = os.items.map(item => ({ ...item, dataDevolucaoReal: dataConclusao }));
+        const realTotal = updatedItems.reduce((acc, item) => {
+          const itemWithCompletion = { ...item, dataDevolucaoReal: dataConclusao };
+          return acc + calculateItemCost(itemWithCompletion, true);
+        }, 0) - descontoManual;
+        const valorTotalReal = Math.max(0, Number(realTotal)); // Garantir que seja número válido
+        updatedOS = { 
+          ...os, 
+          status: OSStatus.FINALIZADO, 
+          items: updatedItems,
+          descontoManual: descontoManual, // Valor validado
+          valorTotalReal: valorTotalReal, // Valor validado
+          dataConclusao: dataConclusao
+        };
+        return updatedOS;
+      }
+      return os;
     });
+
+    setOrders(updatedOrders);
 
     // Trigger PDF generation for the finalized OS
     if (updatedOS) {
@@ -1032,7 +1031,8 @@ const App: React.FC = () => {
           stock,
           clients,
           orders: updatedOrders,
-          retiradas
+          retiradas,
+          despesas
         });
         console.log('✅ Ordem finalizada e sincronizada com Google Sheets');
       } catch (err: any) {

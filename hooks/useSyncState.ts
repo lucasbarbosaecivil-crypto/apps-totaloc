@@ -137,6 +137,7 @@ export function useSyncState(): UseSyncStateReturn {
       clients,
       orders,
       retiradas,
+      despesas: [], // Despesas não são gerenciadas pelo useSyncState, então passa vazio
     });
   }, [isAuthenticated, catalogo, stock, clients, orders, retiradas, syncAll]);
 
