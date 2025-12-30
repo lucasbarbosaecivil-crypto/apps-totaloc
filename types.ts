@@ -72,6 +72,7 @@ export interface ServiceOrder {
   valorTotalPrevisto: number;
   valorTotalReal?: number;
   dataConclusao?: string; // Data de conclusão da ordem
+  observacao?: string; // Observações sobre a locação
 }
 
 export enum AgrupadorDespesa {

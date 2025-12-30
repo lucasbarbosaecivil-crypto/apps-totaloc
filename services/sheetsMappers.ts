@@ -216,6 +216,7 @@ export const ORDENS_HEADERS = [
   'Valor_Total_Previsto',
   'Valor_Total_Real',
   'Data_Criacao',
+  'Observacao',
 ];
 
 export function ordemToRow(os: ServiceOrder): any[] {
@@ -241,6 +242,7 @@ export function ordemToRow(os: ServiceOrder): any[] {
     valorTotalPrevisto, // Sempre será um número válido
     valorTotalReal, // Number ou string vazia
     new Date().toISOString().split('T')[0],
+    os.observacao || '', // Observação
   ];
 }
 
@@ -259,6 +261,7 @@ export function rowToOrdem(row: any[], headers: string[]): ServiceOrder {
     valorTotalReal: getCol('Valor_Total_Real') 
       ? parseFloat(getCol('Valor_Total_Real')) 
       : undefined,
+    observacao: getCol('Observacao') || undefined,
     items: [], // Será preenchido pela tabela OS_ITENS
   };
 }

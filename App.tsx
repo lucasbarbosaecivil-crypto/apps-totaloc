@@ -457,10 +457,12 @@ const App: React.FC = () => {
     clientId: string;
     items: OSItem[];
     descontoManual: number;
+    observacao?: string;
   }>({
     clientId: '',
     items: [],
-    descontoManual: 0
+    descontoManual: 0,
+    observacao: ''
   });
 
   const [selectedStockId, setSelectedStockId] = useState('');
@@ -914,7 +916,8 @@ const App: React.FC = () => {
     setNewOS({
       clientId: os.clientId,
       items: [...os.items],
-      descontoManual: os.descontoManual
+      descontoManual: os.descontoManual,
+      observacao: os.observacao || ''
     });
     setIsModalOpen('os');
   };
@@ -967,7 +970,8 @@ const App: React.FC = () => {
               clientId: newOS.clientId,
               items: [...newOS.items],
               descontoManual: descontoManual, // Valor validado
-              valorTotalPrevisto: valorTotalPrevisto // Valor validado
+              valorTotalPrevisto: valorTotalPrevisto, // Valor validado
+              observacao: newOS.observacao || undefined
             }
           : os
       );
@@ -982,7 +986,8 @@ const App: React.FC = () => {
         items: [...newOS.items],
         descontoManual: descontoManual, // Valor validado
         status: OSStatus.ATIVO,
-        valorTotalPrevisto: valorTotalPrevisto // Valor validado
+        valorTotalPrevisto: valorTotalPrevisto, // Valor validado
+        observacao: newOS.observacao || undefined
       };
 
       updatedOrders = [...orders, os];
@@ -998,7 +1003,8 @@ const App: React.FC = () => {
           stock,
           clients,
           orders: updatedOrders,
-          retiradas
+          retiradas,
+          despesas
         });
         console.log('✅ Locação sincronizada com Google Sheets');
       } catch (err: any) {
@@ -1008,7 +1014,7 @@ const App: React.FC = () => {
     }
 
     setIsModalOpen(null);
-    setNewOS({ clientId: '', items: [], descontoManual: 0 });
+    setNewOS({ clientId: '', items: [], descontoManual: 0, observacao: '' });
   };
 
   const handleFinishOS = (id: string) => {
@@ -1934,41 +1940,38 @@ const App: React.FC = () => {
 
           {activeTab === 'locacoes' && (
             <div className="space-y-6 animate-in fade-in duration-500">
-               <div className="flex justify-between items-center">
+              <div className="flex justify-between items-center">
                 <h3 className="text-lg font-bold">Locações</h3>
-                <button onClick={() => setIsModalOpen('os')} className="bg-blue-600 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 shadow-xl shadow-blue-500/20 transition-transform active:scale-95">
+                <button onClick={() => setIsModalOpen('os')} className="bg-blue-600 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 shadow-xl shadow-blue-500/20 transition-transform active:scale-95 hover:bg-blue-700">
                   <Plus size={18} /> Novo Contrato
                 </button>
               </div>
 
-              <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden overflow-x-auto">
-                <table className="w-full text-left min-w-[800px]">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-100 text-[8px] md:text-[10px] font-black uppercase tracking-widest text-slate-400">
-                      <th className="px-2 py-2 md:px-8 md:py-5">ID OS</th>
-                      <th className="px-8 py-5">Cliente</th>
-                      <th className="px-8 py-5">Itens</th>
-                      <th className="px-8 py-5">Período</th>
-                      <th className="px-8 py-5">Desconto</th>
-                      <th className="px-8 py-5">Valor Previsto</th>
-                      <th className="px-8 py-5 text-right">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                {activeOrders.map(os => {
-                  const cli = clients.find(c => c.id === os.clientId);
-                  return (
-                        <tr key={os.id} className="hover:bg-slate-50 transition-colors">
-                          <td className="px-8 py-5">
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono text-xs font-bold text-slate-700">{os.id}</span>
+              {activeOrders.length === 0 ? (
+                <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 p-12 text-center text-slate-400">
+                  <ClipboardCheck size={48} className="mx-auto mb-4 opacity-50" />
+                  <p className="font-bold">Nenhuma locação ativa</p>
+                  <p className="text-sm mt-2">Clique em "Novo Contrato" para criar uma nova locação</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {activeOrders.map(os => {
+                    const cli = clients.find(c => c.id === os.clientId);
+                    return (
+                      <div key={os.id} className="bg-white rounded-[2rem] shadow-sm border border-slate-200 p-6 hover:shadow-lg transition-all">
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="font-mono text-xs font-bold text-slate-500">ID: {os.id}</span>
                               <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tighter">Ativa</span>
+                            </div>
+                            <h4 className="font-black text-lg text-slate-800">{cli?.nome || 'Cliente não encontrado'}</h4>
                           </div>
-                          </td>
-                          <td className="px-8 py-5">
-                            <p className="font-bold text-slate-800">{cli?.nome || 'Cliente não encontrado'}</p>
-                          </td>
-                          <td className="px-8 py-5">
+                        </div>
+                        
+                        <div className="space-y-3 mb-4">
+                          <div>
+                            <p className="text-xs text-slate-500 mb-2">Itens</p>
                             <div className="space-y-1">
                               {os.items.map((item, idx) => {
                                 const availableItem = item.stockItemId 
@@ -1979,86 +1982,85 @@ const App: React.FC = () => {
                                 const model = availableItem?.equipment || 
                                   catalogo.find(m => m.id === (item.stockItemId ? undefined : item.equipmentModelId));
                                 return (
-                                  <div key={idx} className="text-xs text-slate-600">
+                                  <div key={idx} className="text-sm text-slate-700 bg-slate-50 px-3 py-2 rounded-lg">
                                     <span className="font-bold">{model?.nome || 'Equipamento'}</span>
                                     {item.stockItemId && (
-                                      <span className="text-slate-400 ml-2">(ID: {item.stockItemId})</span>
+                                      <span className="text-slate-500 text-xs ml-2">(ID: {item.stockItemId})</span>
                                     )}
                                     {item.quantidade && (
-                                      <span className="text-slate-400 ml-2">Qtd: {item.quantidade}</span>
+                                      <span className="text-slate-500 text-xs ml-2">Qtd: {item.quantidade}</span>
                                     )}
-                        </div>
+                                  </div>
                                 );
                               })}
-                        </div>
-                          </td>
-                          <td className="px-8 py-5">
-                            <div className="text-xs text-slate-600">
-                              {os.items.length > 0 && (
-                                <>
-                                  <p className="font-bold">{formatDateBR(os.items[0].dataInicio)}</p>
-                                  <p className="text-slate-400">até {formatDateBR(os.items[0].dataFimPrevista)}</p>
-                                </>
-                              )}
-                      </div>
-                          </td>
-                          <td className="px-8 py-5">
-                            {os.descontoManual > 0 ? (
-                              <span className="text-xs font-bold text-red-600">- R$ {os.descontoManual.toLocaleString()}</span>
-                            ) : (
-                              <span className="text-xs text-slate-400">-</span>
-                            )}
-                          </td>
-                          <td className="px-8 py-5">
-                            <p className="text-lg font-black text-blue-600">R$ {os.valorTotalPrevisto.toLocaleString()}</p>
-                          </td>
-                          <td className="px-8 py-5 text-right">
-                            <div className="flex justify-end gap-2">
-                              <button 
-                                onClick={() => generateOSPDF(os)} 
-                                className="bg-white border border-slate-200 text-slate-600 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center gap-2"
-                                title="Ver contrato (previsão)"
-                              >
-                                <FileText size={14}/> PDF
-                              </button>
-                              <button 
-                                onClick={() => handleEditOS(os.id)} 
-                                className="bg-blue-50 text-blue-600 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-100 transition-all flex items-center gap-2"
-                                title="Modificar locação"
-                              >
-                                <Save size={14}/> Modificar
-                              </button>
-                              <button 
-                                onClick={() => handleDeleteOS(os.id)} 
-                                className="bg-red-50 text-red-600 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-100 transition-all flex items-center gap-2"
-                                title="Excluir locação"
-                              >
-                                <Trash2 size={14}/> Excluir
-                              </button>
-                              <button 
-                                onClick={() => handleFinishOS(os.id)} 
-                                className="bg-slate-900 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all flex items-center gap-2"
-                                title="Encerrar e recalcular"
-                              >
-                                <CheckCircle2 size={14}/> Encerrar
-                              </button>
                             </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                    {activeOrders.length === 0 && (
-                      <tr>
-                        <td colSpan={7} className="px-8 py-12 text-center text-slate-400">
-                          <ClipboardCheck size={48} className="mx-auto mb-4 opacity-50" />
-                          <p className="font-bold">Nenhuma locação ativa</p>
-                          <p className="text-sm mt-2">Clique em "Novo Contrato" para criar uma nova locação</p>
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                          </div>
+                          
+                          {os.items.length > 0 && (
+                            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                              <span className="text-xs text-slate-500">Período</span>
+                              <div className="text-right">
+                                <p className="text-sm font-bold text-slate-700">{formatDateBR(os.items[0].dataInicio)}</p>
+                                <p className="text-xs text-slate-500">até {formatDateBR(os.items[0].dataFimPrevista)}</p>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {os.descontoManual > 0 && (
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-slate-500">Desconto</span>
+                              <span className="text-sm font-bold text-red-600">- R$ {os.descontoManual.toLocaleString()}</span>
+                            </div>
+                          )}
+                          
+                          <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                            <span className="text-xs text-slate-500">Valor Previsto</span>
+                            <p className="text-xl font-black text-blue-600">R$ {os.valorTotalPrevisto.toLocaleString()}</p>
+                          </div>
+                          
+                          {os.observacao && (
+                            <div className="pt-2 border-t border-slate-100">
+                              <p className="text-xs text-slate-500 mb-1">Observação</p>
+                              <p className="text-sm text-slate-700 bg-slate-50 px-3 py-2 rounded-lg">{os.observacao}</p>
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-2 pt-4 border-t border-slate-100">
+                          <button 
+                            onClick={() => generateOSPDF(os)} 
+                            className="bg-white border border-slate-200 text-slate-600 px-3 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
+                            title="Ver contrato (previsão)"
+                          >
+                            <FileText size={14}/> PDF
+                          </button>
+                          <button 
+                            onClick={() => handleEditOS(os.id)} 
+                            className="bg-blue-50 text-blue-600 px-3 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-blue-100 transition-all flex items-center justify-center gap-2"
+                            title="Modificar locação"
+                          >
+                            <Save size={14}/> Editar
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteOS(os.id)} 
+                            className="bg-red-50 text-red-600 px-3 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-red-100 transition-all flex items-center justify-center gap-2"
+                            title="Excluir locação"
+                          >
+                            <Trash2 size={14}/> Excluir
+                          </button>
+                          <button 
+                            onClick={() => handleFinishOS(os.id)} 
+                            className="bg-slate-900 text-white px-3 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-blue-600 transition-all flex items-center justify-center gap-2"
+                            title="Encerrar e recalcular"
+                          >
+                            <CheckCircle2 size={14}/> Encerrar
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
@@ -2087,33 +2089,33 @@ const App: React.FC = () => {
                               </div>
 
               <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden overflow-x-auto">
-                <table className="w-full text-left min-w-[600px]">
+                <table className="w-full text-left">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-100 text-[8px] md:text-[10px] font-black uppercase tracking-widest text-slate-400">
-                      <th className="px-2 py-2 md:px-8 md:py-5">Data</th>
-                      <th className="px-2 py-2 md:px-8 md:py-5">Agrupador</th>
-                      <th className="px-2 py-2 md:px-8 md:py-5">Descrição</th>
-                      <th className="px-2 py-2 md:px-8 md:py-5 text-right">Valor</th>
-                      <th className="px-2 py-2 md:px-8 md:py-5 text-right">Ações</th>
+                      <th className="px-3 py-3 w-[120px]">Data</th>
+                      <th className="px-3 py-3 w-[140px]">Agrupador</th>
+                      <th className="px-3 py-3">Descrição</th>
+                      <th className="px-3 py-3 w-[140px] text-right">Valor</th>
+                      <th className="px-3 py-3 w-[180px] text-right">Ações</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
                     {despesas.map(despesa => (
                       <tr key={despesa.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-2 py-2 md:px-8 md:py-5 text-[10px] md:text-sm text-slate-700">{formatDateBR(despesa.data)}</td>
-                        <td className="px-2 py-2 md:px-8 md:py-5">
-                          <span className="bg-slate-100 text-slate-700 px-2 py-0.5 md:px-3 md:py-1 rounded-full text-[10px] md:text-xs font-bold uppercase">
+                        <td className="px-3 py-3 text-sm text-slate-700">{formatDateBR(despesa.data)}</td>
+                        <td className="px-3 py-3">
+                          <span className="bg-slate-100 text-slate-700 px-2 py-1 rounded-full text-xs font-bold uppercase">
                             {despesa.agrupador}
                           </span>
                         </td>
-                        <td className="px-2 py-2 md:px-8 md:py-5">
-                          <p className="font-bold text-[12px] md:text-base text-slate-800">{despesa.descricao}</p>
+                        <td className="px-3 py-3">
+                          <p className="font-bold text-sm text-slate-800">{despesa.descricao}</p>
                         </td>
-                        <td className="px-2 py-2 md:px-8 md:py-5 text-right">
-                          <p className="text-[14px] md:text-lg font-black text-red-600">R$ {despesa.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                        <td className="px-3 py-3 text-right">
+                          <p className="text-base font-black text-red-600">R$ {despesa.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                         </td>
-                        <td className="px-2 py-2 md:px-8 md:py-5 text-right">
-                          <div className="flex items-center gap-1 md:gap-2 justify-end flex-wrap">
+                        <td className="px-3 py-3 text-right">
+                          <div className="flex items-center gap-2 justify-end">
                             <button
                               onClick={() => {
                                 setNewDespesa({
@@ -2125,17 +2127,17 @@ const App: React.FC = () => {
                                 setEditingDespesaId(despesa.id);
                                 setIsModalOpen('despesa');
                               }}
-                              className="bg-blue-50 text-blue-600 px-2 py-1 md:px-4 md:py-2 rounded-xl text-[8px] md:text-[10px] font-black uppercase tracking-widest hover:bg-blue-100 transition-all flex items-center gap-1 md:gap-2"
+                              className="bg-blue-50 text-blue-600 px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-blue-100 transition-all flex items-center gap-1.5"
                               title="Editar despesa"
                             >
-                              <Save size={12} className="md:w-[14px] md:h-[14px]"/> Modificar
+                              <Save size={14}/> Modificar
                             </button>
                             <button
                               onClick={() => handleDeleteDespesa(despesa.id)}
-                              className="bg-red-50 text-red-600 px-2 py-1 md:px-4 md:py-2 rounded-xl text-[8px] md:text-[10px] font-black uppercase tracking-widest hover:bg-red-100 transition-all flex items-center gap-1 md:gap-2"
+                              className="bg-red-50 text-red-600 px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-red-100 transition-all flex items-center gap-1.5"
                               title="Excluir despesa"
                             >
-                              <Trash2 size={12} className="md:w-[14px] md:h-[14px]"/> Excluir
+                              <Trash2 size={14}/> Excluir
                             </button>
                               </div>
                         </td>
@@ -2154,10 +2156,10 @@ const App: React.FC = () => {
                   {despesas.length > 0 && (
                     <tfoot>
                       <tr className="bg-slate-100 border-t-2 border-slate-200">
-                        <td colSpan={3} className="px-8 py-4 text-right font-black text-slate-700 uppercase text-xs">
+                        <td colSpan={3} className="px-3 py-4 text-right font-black text-slate-700 uppercase text-xs">
                           Total de Despesas:
                         </td>
-                        <td className="px-8 py-4 text-right">
+                        <td className="px-3 py-4 text-right">
                           <p className="text-xl font-black text-red-600">
                             R$ {despesas.reduce((acc, d) => acc + d.valor, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </p>
@@ -2195,27 +2197,27 @@ const App: React.FC = () => {
               </div>
 
               <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden overflow-x-auto">
-                <table className="w-full text-left min-w-[500px]">
+                <table className="w-full text-left">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-100 text-[8px] md:text-[10px] font-black uppercase tracking-widest text-slate-400">
-                      <th className="px-2 py-2 md:px-8 md:py-5">Data Retirada</th>
-                      <th className="px-2 py-2 md:px-8 md:py-5">Sócio Retirada</th>
-                      <th className="px-2 py-2 md:px-8 md:py-5 text-right">Valor</th>
-                      <th className="px-2 py-2 md:px-8 md:py-5 text-right">Ações</th>
+                      <th className="px-3 py-3 w-[140px]">Data Retirada</th>
+                      <th className="px-3 py-3">Sócio Retirada</th>
+                      <th className="px-3 py-3 w-[140px] text-right">Valor</th>
+                      <th className="px-3 py-3 w-[180px] text-right">Ações</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
                     {retiradas.map(retirada => (
                       <tr key={retirada.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-2 py-2 md:px-8 md:py-5 text-[10px] md:text-sm text-slate-700">{formatDateBR(retirada.dataRetirada)}</td>
-                        <td className="px-2 py-2 md:px-8 md:py-5">
-                          <p className="font-bold text-[12px] md:text-base text-slate-800">{retirada.socioRetirada}</p>
+                        <td className="px-3 py-3 text-sm text-slate-700">{formatDateBR(retirada.dataRetirada)}</td>
+                        <td className="px-3 py-3">
+                          <p className="font-bold text-sm text-slate-800">{retirada.socioRetirada}</p>
                         </td>
-                        <td className="px-2 py-2 md:px-8 md:py-5 text-right">
-                          <p className="text-[14px] md:text-lg font-black text-orange-600">R$ {retirada.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                        <td className="px-3 py-3 text-right">
+                          <p className="text-base font-black text-orange-600">R$ {retirada.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                         </td>
-                        <td className="px-2 py-2 md:px-8 md:py-5 text-right">
-                          <div className="flex items-center gap-1 md:gap-2 justify-end flex-wrap">
+                        <td className="px-3 py-3 text-right">
+                          <div className="flex items-center gap-2 justify-end">
                             <button
                               onClick={() => {
                                 setNewRetirada({
@@ -2226,17 +2228,17 @@ const App: React.FC = () => {
                                 setEditingRetiradaId(retirada.id);
                                 setIsModalOpen('retirada');
                               }}
-                              className="bg-blue-50 text-blue-600 px-2 py-1 md:px-4 md:py-2 rounded-xl text-[8px] md:text-[10px] font-black uppercase tracking-widest hover:bg-blue-100 transition-all flex items-center gap-1 md:gap-2"
+                              className="bg-blue-50 text-blue-600 px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-blue-100 transition-all flex items-center gap-1.5"
                               title="Editar retirada"
                             >
-                              <Save size={12} className="md:w-[14px] md:h-[14px]"/> Modificar
+                              <Save size={14}/> Modificar
                             </button>
                             <button
                               onClick={() => handleDeleteRetirada(retirada.id)}
-                              className="bg-red-50 text-red-600 px-2 py-1 md:px-4 md:py-2 rounded-xl text-[8px] md:text-[10px] font-black uppercase tracking-widest hover:bg-red-100 transition-all flex items-center gap-1 md:gap-2"
+                              className="bg-red-50 text-red-600 px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-red-100 transition-all flex items-center gap-1.5"
                               title="Excluir retirada"
                             >
-                              <Trash2 size={12} className="md:w-[14px] md:h-[14px]"/> Excluir
+                              <Trash2 size={14}/> Excluir
                         </button>
                       </div>
                         </td>
@@ -2255,10 +2257,10 @@ const App: React.FC = () => {
                   {retiradas.length > 0 && (
                     <tfoot>
                       <tr className="bg-slate-100 border-t-2 border-slate-200">
-                        <td colSpan={2} className="px-8 py-4 text-right font-black text-slate-700 uppercase text-xs">
+                        <td colSpan={2} className="px-3 py-4 text-right font-black text-slate-700 uppercase text-xs">
                           Total de Retiradas:
                         </td>
-                        <td className="px-8 py-4 text-right">
+                        <td className="px-3 py-4 text-right">
                           <p className="text-xl font-black text-orange-600">
                             R$ {retiradas.reduce((acc, r) => acc + r.valor, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </p>
@@ -2361,10 +2363,10 @@ const App: React.FC = () => {
           {activeTab === 'catalogo' && (
             <div className="space-y-6 animate-in fade-in duration-500">
               <div className="flex justify-between items-center">
-                     <div>
+                <div>
                   <h3 className="text-lg font-bold">Equipamentos</h3>
                   <p className="text-slate-500 text-sm">Cadastro de equipamentos disponíveis para locação</p>
-                     </div>
+                </div>
                 <button 
                   onClick={() => {
                     setNewCat({ unidade: RentalUnit.DIARIA, foto: 'https://images.unsplash.com/photo-1581094288338-2314dddb7bc3?w=400' });
@@ -2375,83 +2377,73 @@ const App: React.FC = () => {
                 >
                   <Plus size={18} /> Novo Equipamento
                 </button>
-                   </div>
+              </div>
 
-              <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden overflow-x-auto">
-                <table className="w-full text-left min-w-[700px]">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-100 text-[8px] md:text-[10px] font-black uppercase tracking-widest text-slate-400">
-                      <th className="px-2 py-2 md:px-8 md:py-5">ID</th>
-                      <th className="px-2 py-2 md:px-8 md:py-5">Equipamento</th>
-                      <th className="px-2 py-2 md:px-8 md:py-5">Valor Unitário</th>
-                      <th className="px-2 py-2 md:px-8 md:py-5">Unidade</th>
-                      <th className="px-2 py-2 md:px-8 md:py-5">Número de Série</th>
-                      <th className="px-2 py-2 md:px-8 md:py-5">Quantidade</th>
-                      <th className="px-2 py-2 md:px-8 md:py-5 text-right">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {catalogo.map(equipamento => (
-                      <tr key={equipamento.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-2 py-2 md:px-8 md:py-5 font-mono text-[10px] md:text-xs font-bold text-slate-500">{equipamento.id}</td>
-                        <td className="px-2 py-2 md:px-8 md:py-5">
-                          <div>
-                            <p className="font-bold text-[12px] md:text-base text-slate-800">{equipamento.nome}</p>
-                            {equipamento.descricao && (
-                              <p className="text-[10px] md:text-xs text-slate-400 mt-1">{equipamento.descricao}</p>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-2 py-2 md:px-8 md:py-5">
-                          <span className="text-[14px] md:text-lg font-black text-blue-600">R$ {equipamento.valorUnitario.toLocaleString()}</span>
-                        </td>
-                        <td className="px-2 py-2 md:px-8 md:py-5">
-                          <span className="bg-blue-100 text-blue-700 px-2 py-0.5 md:px-3 md:py-1 rounded-full text-[10px] md:text-xs font-bold uppercase">
+              {catalogo.length === 0 ? (
+                <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 p-12 text-center text-slate-400">
+                  <Package size={48} className="mx-auto mb-4 opacity-50" />
+                  <p className="font-bold">Nenhum equipamento cadastrado</p>
+                  <p className="text-sm mt-2">Clique em "Novo Equipamento" para começar</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {catalogo.map(equipamento => (
+                    <div key={equipamento.id} className="bg-white rounded-[2rem] shadow-sm border border-slate-200 p-6 hover:shadow-lg transition-all">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex-1">
+                          <p className="font-mono text-xs font-bold text-slate-500 mb-1">ID: {equipamento.id}</p>
+                          <h4 className="font-black text-lg text-slate-800 mb-2">{equipamento.nome}</h4>
+                          {equipamento.descricao && (
+                            <p className="text-sm text-slate-500 line-clamp-2">{equipamento.descricao}</p>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-3 mb-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-slate-500">Valor Unitário</span>
+                          <span className="text-lg font-black text-blue-600">R$ {equipamento.valorUnitario.toLocaleString()}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-slate-500">Unidade</span>
+                          <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold uppercase">
                             {equipamento.unidade}
                           </span>
-                        </td>
-                        <td className="px-2 py-2 md:px-8 md:py-5">
-                          <span className="font-mono text-[10px] md:text-xs text-slate-600">
-                            {equipamento.numSerie || '-'}
-                          </span>
-                        </td>
-                        <td className="px-2 py-2 md:px-8 md:py-5">
-                          <span className="text-[10px] md:text-xs font-bold text-slate-700">
-                            {equipamento.quantidade !== undefined ? equipamento.quantidade.toLocaleString() : '-'}
-                          </span>
-                        </td>
-                        <td className="px-2 py-2 md:px-8 md:py-5 text-right">
-                          <div className="flex items-center gap-1 md:gap-2 justify-end flex-wrap">
-                            <button
-                              onClick={() => handleEditCatalog(equipamento)}
-                              className="bg-blue-50 text-blue-600 px-2 py-1 md:px-4 md:py-2 rounded-xl text-[8px] md:text-[10px] font-black uppercase tracking-widest hover:bg-blue-100 transition-all flex items-center gap-1 md:gap-2"
-                              title="Editar equipamento"
-                            >
-                              <Save size={12} className="md:w-[14px] md:h-[14px]"/> Modificar
-                            </button>
-                            <button
-                              onClick={() => handleDeleteEquipment(equipamento.id)}
-                              className="bg-red-50 text-red-600 px-2 py-1 md:px-4 md:py-2 rounded-xl text-[8px] md:text-[10px] font-black uppercase tracking-widest hover:bg-red-100 transition-all flex items-center gap-1 md:gap-2"
-                              title="Excluir equipamento"
-                            >
-                              <Trash2 size={12} className="md:w-[14px] md:h-[14px]"/> Excluir
-                            </button>
+                        </div>
+                        {equipamento.numSerie && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-slate-500">Número de Série</span>
+                            <span className="font-mono text-xs text-slate-600">{equipamento.numSerie}</span>
                           </div>
-                        </td>
-                      </tr>
-                    ))}
-                    {catalogo.length === 0 && (
-                      <tr>
-                        <td colSpan={7} className="px-8 py-12 text-center text-slate-400">
-                          <Package size={48} className="mx-auto mb-4 opacity-50" />
-                          <p className="font-bold">Nenhum equipamento cadastrado</p>
-                          <p className="text-sm mt-2">Clique em "Novo Equipamento" para começar</p>
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                        )}
+                        {equipamento.quantidade !== undefined && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-slate-500">Quantidade</span>
+                            <span className="text-sm font-bold text-slate-700">{equipamento.quantidade.toLocaleString()}</span>
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="flex gap-2 pt-4 border-t border-slate-100">
+                        <button
+                          onClick={() => handleEditCatalog(equipamento)}
+                          className="flex-1 bg-blue-50 text-blue-600 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-blue-100 transition-all flex items-center justify-center gap-2"
+                          title="Editar equipamento"
+                        >
+                          <Save size={14}/> Modificar
+                        </button>
+                        <button
+                          onClick={() => handleDeleteEquipment(equipamento.id)}
+                          className="flex-1 bg-red-50 text-red-600 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-red-100 transition-all flex items-center justify-center gap-2"
+                          title="Excluir equipamento"
+                        >
+                          <Trash2 size={14}/> Excluir
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -2474,103 +2466,92 @@ const App: React.FC = () => {
                 </button>
               </div>
 
-              <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden overflow-x-auto">
-                <table className="w-full text-left min-w-[800px]">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-100 text-[8px] md:text-[10px] font-black uppercase tracking-widest text-slate-400">
-                      <th className="px-2 py-2 md:px-8 md:py-5">ID</th>
-                      <th className="px-2 py-2 md:px-8 md:py-5">Nome</th>
-                      <th className="px-2 py-2 md:px-8 md:py-5">Documento</th>
-                      <th className="px-2 py-2 md:px-8 md:py-5">Telefone</th>
-                      <th className="px-2 py-2 md:px-8 md:py-5">Email</th>
-                      <th className="px-2 py-2 md:px-8 md:py-5">Endereço</th>
-                      <th className="px-2 py-2 md:px-8 md:py-5 text-right">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {clients.map(client => (
-                      <tr key={client.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-2 py-2 md:px-8 md:py-5 font-mono text-[10px] md:text-xs font-bold text-slate-500">{client.id}</td>
-                        <td className="px-2 py-2 md:px-8 md:py-5">
-                          <p className="font-bold text-[12px] md:text-base text-slate-800">{client.nome}</p>
-                        </td>
-                        <td className="px-2 py-2 md:px-8 md:py-5">
-                          {client.tipoDocumento && client.documento ? (
-                            <div className="flex flex-col">
-                              <span className="text-[10px] md:text-xs text-slate-500">{client.tipoDocumento}</span>
-                              <span className="text-[12px] md:text-sm font-medium text-slate-700">{formatDocument(client.documento, client.tipoDocumento)}</span>
-                            </div>
-                          ) : (
-                            <span className="text-[10px] md:text-xs text-slate-400">-</span>
-                          )}
-                        </td>
-                        <td className="px-2 py-2 md:px-8 md:py-5">
-                          <span className="text-[10px] md:text-sm text-slate-700">{client.telefone || '-'}</span>
-                        </td>
-                        <td className="px-2 py-2 md:px-8 md:py-5">
-                          <span className="text-[10px] md:text-sm text-slate-700">{client.email || '-'}</span>
-                        </td>
-                        <td className="px-2 py-2 md:px-8 md:py-5">
-                          <span className="text-[10px] md:text-sm text-slate-600">
-                            {(() => {
-                              if (client.rua && client.numero) {
-                                return `${client.rua}, ${client.numero}${client.cidade ? ` - ${client.cidade}` : ''}`;
-                              }
-                              if (client.endereco) {
-                                return client.endereco;
-                              }
-                              if (client.rua) {
-                                return `${client.rua}${client.numero ? `, ${client.numero}` : ''}${client.cidade ? ` - ${client.cidade}` : ''}`;
-                              }
-                              return client.cidade || '-';
-                            })()}
-                          </span>
-                        </td>
-                        <td className="px-2 py-2 md:px-8 md:py-5 text-right">
-                          <div className="flex items-center gap-1 md:gap-2 justify-end flex-wrap">
-                            <button
-                              onClick={() => {
-                                setNewCli({
-                                  nome: client.nome,
-                                  telefone: client.telefone,
-                                  email: client.email,
-                                  rua: client.rua,
-                                  numero: client.numero,
-                                  cidade: client.cidade || 'Presidente Olegário-MG',
-                                  tipoDocumento: client.tipoDocumento,
-                                  documento: client.documento,
-                                });
-                                setEditingCliId(client.id);
-                                setIsModalOpen('client');
-                              }}
-                              className="bg-blue-50 text-blue-600 px-2 py-1 md:px-4 md:py-2 rounded-xl text-[8px] md:text-[10px] font-black uppercase tracking-widest hover:bg-blue-100 transition-all flex items-center gap-1 md:gap-2"
-                              title="Editar cliente"
-                            >
-                              <Save size={12} className="md:w-[14px] md:h-[14px]"/> Modificar
-                            </button>
-                            <button
-                              onClick={() => handleDeleteClient(client.id)}
-                              className="bg-red-50 text-red-600 px-2 py-1 md:px-4 md:py-2 rounded-xl text-[8px] md:text-[10px] font-black uppercase tracking-widest hover:bg-red-100 transition-all flex items-center gap-1 md:gap-2"
-                              title="Excluir cliente"
-                            >
-                              <Trash2 size={12} className="md:w-[14px] md:h-[14px]"/> Excluir
-                            </button>
+              {clients.length === 0 ? (
+                <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 p-12 text-center text-slate-400">
+                  <Users size={48} className="mx-auto mb-4 opacity-50" />
+                  <p className="font-bold">Nenhum cliente cadastrado</p>
+                  <p className="text-sm mt-2">Clique em "Novo Cliente" para começar</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {clients.map(client => (
+                    <div key={client.id} className="bg-white rounded-[2rem] shadow-sm border border-slate-200 p-6 hover:shadow-lg transition-all">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex-1">
+                          <p className="font-mono text-xs font-bold text-slate-500 mb-1">ID: {client.id}</p>
+                          <h4 className="font-black text-lg text-slate-800 mb-2">{client.nome}</h4>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-3 mb-4">
+                        {client.tipoDocumento && client.documento && (
+                          <div className="flex items-start justify-between">
+                            <span className="text-xs text-slate-500">{client.tipoDocumento}</span>
+                            <span className="text-sm font-medium text-slate-700 text-right">{formatDocument(client.documento, client.tipoDocumento)}</span>
                           </div>
-                        </td>
-                      </tr>
-                    ))}
-                    {clients.length === 0 && (
-                      <tr>
-                        <td colSpan={7} className="px-8 py-12 text-center text-slate-400">
-                          <Users size={48} className="mx-auto mb-4 opacity-50" />
-                          <p className="font-bold">Nenhum cliente cadastrado</p>
-                          <p className="text-sm mt-2">Clique em "Novo Cliente" para começar</p>
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                        )}
+                        {client.telefone && (
+                          <div className="flex items-center gap-2">
+                            <Phone size={14} className="text-slate-400" />
+                            <span className="text-sm text-slate-700">{client.telefone}</span>
+                          </div>
+                        )}
+                        {client.email && (
+                          <div className="flex items-center gap-2">
+                            <Mail size={14} className="text-slate-400" />
+                            <span className="text-sm text-slate-700 truncate">{client.email}</span>
+                          </div>
+                        )}
+                        {(() => {
+                          const endereco = client.rua && client.numero 
+                            ? `${client.rua}, ${client.numero}${client.cidade ? ` - ${client.cidade}` : ''}`
+                            : client.endereco
+                            ? client.endereco
+                            : client.rua
+                            ? `${client.rua}${client.numero ? `, ${client.numero}` : ''}${client.cidade ? ` - ${client.cidade}` : ''}`
+                            : client.cidade || null;
+                          return endereco ? (
+                            <div className="flex items-start gap-2">
+                              <MapPin size={14} className="text-slate-400 mt-0.5 flex-shrink-0" />
+                              <span className="text-sm text-slate-600">{endereco}</span>
+                            </div>
+                          ) : null;
+                        })()}
+                      </div>
+                      
+                      <div className="flex gap-2 pt-4 border-t border-slate-100">
+                        <button
+                          onClick={() => {
+                            setNewCli({
+                              nome: client.nome,
+                              telefone: client.telefone,
+                              email: client.email,
+                              rua: client.rua,
+                              numero: client.numero,
+                              cidade: client.cidade || 'Presidente Olegário-MG',
+                              tipoDocumento: client.tipoDocumento,
+                              documento: client.documento,
+                            });
+                            setEditingCliId(client.id);
+                            setIsModalOpen('client');
+                          }}
+                          className="flex-1 bg-blue-50 text-blue-600 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-blue-100 transition-all flex items-center justify-center gap-2"
+                          title="Editar cliente"
+                        >
+                          <Save size={14}/> Modificar
+                        </button>
+                        <button
+                          onClick={() => handleDeleteClient(client.id)}
+                          className="flex-1 bg-red-50 text-red-600 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-red-100 transition-all flex items-center justify-center gap-2"
+                          title="Excluir cliente"
+                        >
+                          <Trash2 size={14}/> Excluir
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -2583,78 +2564,70 @@ const App: React.FC = () => {
                 </div>
               </div>
 
-              <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden overflow-x-auto">
-                <table className="w-full text-left min-w-[600px]">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-100 text-[8px] md:text-[10px] font-black uppercase tracking-widest text-slate-400">
-                      <th className="px-2 py-2 md:px-8 md:py-5">ID</th>
-                      <th className="px-2 py-2 md:px-8 md:py-5">Equipamento</th>
-                      <th className="px-2 py-2 md:px-8 md:py-5">Tipo</th>
-                      <th className="px-2 py-2 md:px-8 md:py-5">Disponível</th>
-                      <th className="px-2 py-2 md:px-8 md:py-5">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {availableStock.map(item => (
-                      <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-2 py-2 md:px-8 md:py-5 font-mono text-[10px] md:text-xs font-bold text-slate-500">{item.id}</td>
-                        <td className="px-2 py-2 md:px-8 md:py-5">
-                          <div>
-                            <p className="font-bold text-[12px] md:text-base text-slate-800">{item.equipment.nome}</p>
-                            {item.equipment.descricao && (
-                              <p className="text-[10px] md:text-xs text-slate-400 mt-1">{item.equipment.descricao}</p>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-2 py-2 md:px-8 md:py-5">
-                          <span className="bg-slate-100 text-slate-700 px-2 py-0.5 md:px-3 md:py-1 rounded-full text-[10px] md:text-xs font-bold uppercase">
+              {availableStock.length === 0 ? (
+                <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 p-12 text-center text-slate-400">
+                  <Layers size={48} className="mx-auto mb-4 opacity-50" />
+                  <p className="font-bold">Nenhum equipamento disponível no momento</p>
+                  <p className="text-sm mt-2">
+                    {catalogo.length === 0 
+                      ? 'Cadastre equipamentos primeiro em "Cadastro > Equipamentos"'
+                      : 'Todos os equipamentos estão locados. O estoque é atualizado automaticamente quando equipamentos são devolvidos.'}
+                  </p>
+                  {catalogo.length > 0 && (
+                    <div className="mt-4 text-xs text-slate-400 space-y-1">
+                      <p>Equipamentos cadastrados: {catalogo.length}</p>
+                      <p>Locações ativas: {activeOrders.length}</p>
+                      <p className="text-blue-600 mt-2">
+                        💡 O estoque é calculado dinamicamente baseado nos equipamentos cadastrados e nas locações ativas.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {availableStock.map(item => (
+                    <div key={item.id} className="bg-white rounded-[2rem] shadow-sm border border-slate-200 p-6 hover:shadow-lg transition-all">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex-1">
+                          <p className="font-mono text-xs font-bold text-slate-500 mb-1">ID: {item.id}</p>
+                          <h4 className="font-black text-lg text-slate-800 mb-2">{item.equipment.nome}</h4>
+                          {item.equipment.descricao && (
+                            <p className="text-sm text-slate-500 line-clamp-2">{item.equipment.descricao}</p>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-3 mb-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-slate-500">Tipo</span>
+                          <span className="bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-xs font-bold uppercase">
                             {item.tipo === 'quantidade' ? 'Por Quantidade' : 'Por ID'}
                           </span>
-                        </td>
-                        <td className="px-2 py-2 md:px-8 md:py-5">
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-slate-500">Disponível</span>
                           {item.tipo === 'quantidade' ? (
-                            <div className="flex flex-col">
-                              <span className="text-[14px] md:text-lg font-black text-green-600">{item.disponivel}</span>
+                            <div className="text-right">
+                              <span className="text-xl font-black text-green-600">{item.disponivel}</span>
                               {item.total !== undefined && (
-                                <span className="text-[10px] md:text-xs text-slate-400">de {item.total} total</span>
+                                <span className="text-xs text-slate-400 block">de {item.total} total</span>
                               )}
                             </div>
                           ) : (
-                            <span className="text-[12px] md:text-sm font-bold text-slate-700">1 unidade</span>
+                            <span className="text-sm font-bold text-slate-700">1 unidade</span>
                           )}
-                        </td>
-                        <td className="px-2 py-2 md:px-8 md:py-5">
-                          <span className="bg-green-100 text-green-700 px-2 py-0.5 md:px-3 md:py-1 rounded-full text-[10px] md:text-xs font-bold uppercase">
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-slate-500">Status</span>
+                          <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold uppercase">
                             Disponível
                           </span>
-                        </td>
-                      </tr>
-                    ))}
-                    {availableStock.length === 0 && (
-                      <tr>
-                        <td colSpan={5} className="px-4 md:px-8 py-8 md:py-12 text-center text-slate-400">
-                          <Layers size={48} className="mx-auto mb-4 opacity-50" />
-                          <p className="font-bold">Nenhum equipamento disponível no momento</p>
-                          <p className="text-sm mt-2">
-                            {catalogo.length === 0 
-                              ? 'Cadastre equipamentos primeiro em "Cadastro &gt; Equipamentos"'
-                              : 'Todos os equipamentos estão locados. O estoque é atualizado automaticamente quando equipamentos são devolvidos.'}
-                          </p>
-                          {catalogo.length > 0 && (
-                            <div className="mt-4 text-xs text-slate-400 space-y-1">
-                              <p>Equipamentos cadastrados: {catalogo.length}</p>
-                              <p>Locações ativas: {activeOrders.length}</p>
-                              <p className="text-blue-600 mt-2">
-                                💡 O estoque é calculado dinamicamente baseado nos equipamentos cadastrados e nas locações ativas.
-                              </p>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-               </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
           
@@ -2698,7 +2671,7 @@ const App: React.FC = () => {
               <button onClick={() => {
                 setIsModalOpen(null);
                 if (isModalOpen === 'os') {
-                  setNewOS({ clientId: '', items: [], descontoManual: 0 });
+                  setNewOS({ clientId: '', items: [], descontoManual: 0, observacao: '' });
                   setEditingOSId(null);
                 }
               }} className="p-4 text-slate-400 hover:text-slate-800"><X size={32}/></button>
@@ -2719,16 +2692,6 @@ const App: React.FC = () => {
                     {/* Seletor de Modo */}
                     <div className="mb-4 md:mb-6 flex gap-2 md:gap-3">
                       <button
-                        onClick={() => setAddMode('id')}
-                        className={`flex-1 py-2 md:py-3 px-3 md:px-4 rounded-xl text-[12px] md:text-sm font-bold transition-all ${
-                          addMode === 'id' 
-                            ? 'bg-blue-600 text-white' 
-                            : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                        }`}
-                      >
-                        Por ID Específico
-                      </button>
-                      <button
                         onClick={() => setAddMode('quantity')}
                         className={`flex-1 py-2 md:py-3 px-3 md:px-4 rounded-xl text-[12px] md:text-sm font-bold transition-all ${
                           addMode === 'quantity' 
@@ -2738,27 +2701,38 @@ const App: React.FC = () => {
                       >
                         Por Quantidade
                       </button>
+                      <button
+                        onClick={() => setAddMode('id')}
+                        className={`flex-1 py-2 md:py-3 px-3 md:px-4 rounded-xl text-[12px] md:text-sm font-bold transition-all ${
+                          addMode === 'id' 
+                            ? 'bg-blue-600 text-white' 
+                            : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                        }`}
+                      >
+                        Por ID Específico
+                      </button>
                     </div>
 
                     {/* Formulário de Adição */}
-                    <div className="flex gap-2 md:gap-4 mb-4 md:mb-6">
+                    <div className="flex flex-col md:flex-row gap-2 md:gap-4 mb-4 md:mb-6">
                       {addMode === 'id' ? (
                         <>
-                      <select className="flex-1 bg-slate-800 border-none rounded-2xl px-4 md:px-6 h-12 md:h-14 text-[12px] md:text-sm text-white outline-none" value={selectedStockId} onChange={e => setSelectedStockId(e.target.value)}>
-                        <option value="">Equipamento Disponível...</option>
-                        {availableStock
-                          .filter(item => item.tipo === 'id' && !newOS.items.some(i => i.stockItemId === item.id))
-                          .map(item => (
-                            <option key={item.id} value={item.id}>
-                              {item.equipment.nome} (Serial: {item.id})
-                            </option>
-                          ))}
-                      </select>
+                          <select className="flex-1 bg-slate-800 border-none rounded-2xl px-4 md:px-6 h-20 text-[12px] md:text-sm text-white outline-none w-full" value={selectedStockId} onChange={e => setSelectedStockId(e.target.value)}>
+                            <option value="">Equipamento Disponível...</option>
+                            {availableStock
+                              .filter(item => item.tipo === 'id' && !newOS.items.some(i => i.stockItemId === item.id))
+                              .map(item => (
+                                <option key={item.id} value={item.id}>
+                                  {item.equipment.nome} (Serial: {item.id})
+                                </option>
+                              ))}
+                          </select>
+                          <button onClick={addItemToOS} className="bg-blue-600 hover:bg-blue-500 w-full md:w-12 h-12 md:h-14 rounded-2xl flex items-center justify-center transition-all"><Plus size={20} className="md:w-[28px] md:h-[28px]"/></button>
                         </>
                       ) : (
                         <>
-                          <select className="flex-1 bg-slate-800 border-none rounded-2xl px-4 md:px-6 h-12 md:h-14 text-[12px] md:text-sm text-white outline-none" value={selectedEquipmentModelId} onChange={e => setSelectedEquipmentModelId(e.target.value)}>
-                            <option value="">Selecione o Equipamento...</option>
+                          <select className="flex-1 bg-slate-800 border-none rounded-2xl px-4 md:px-6 h-20 text-[12px] md:text-sm text-white outline-none w-full" value={selectedEquipmentModelId} onChange={e => setSelectedEquipmentModelId(e.target.value)}>
+                            <option value="">Equipamento Disponível...</option>
                             {availableStock
                               .filter(item => item.tipo === 'quantidade')
                               .map(item => (
@@ -2767,23 +2741,25 @@ const App: React.FC = () => {
                                 </option>
                               ))}
                           </select>
-                          <input
-                            type="number"
-                            min="1"
-                            max={selectedEquipmentModelId ? availableStock.find(item => item.equipment.id === selectedEquipmentModelId && item.tipo === 'quantidade')?.disponivel : undefined}
-                            value={selectedQuantity}
-                            onChange={e => {
-                              const val = parseInt(e.target.value) || 1;
-                              const availableItem = selectedEquipmentModelId ? availableStock.find(item => item.equipment.id === selectedEquipmentModelId && item.tipo === 'quantidade') : undefined;
-                              const maxQty = availableItem?.disponivel;
-                              setSelectedQuantity(maxQty ? Math.min(val, maxQty) : val);
-                            }}
-                            className="w-24 md:w-32 bg-slate-800 border-none rounded-2xl px-3 md:px-6 h-12 md:h-14 text-[12px] md:text-sm text-white outline-none text-center"
-                            placeholder="Qtd"
-                          />
+                          <div className="flex gap-2 md:gap-4 w-full md:w-auto">
+                            <input
+                              type="number"
+                              min="1"
+                              max={selectedEquipmentModelId ? availableStock.find(item => item.equipment.id === selectedEquipmentModelId && item.tipo === 'quantidade')?.disponivel : undefined}
+                              value={selectedQuantity}
+                              onChange={e => {
+                                const val = parseInt(e.target.value) || 1;
+                                const availableItem = selectedEquipmentModelId ? availableStock.find(item => item.equipment.id === selectedEquipmentModelId && item.tipo === 'quantidade') : undefined;
+                                const maxQty = availableItem?.disponivel;
+                                setSelectedQuantity(maxQty ? Math.min(val, maxQty) : val);
+                              }}
+                              className="w-24 md:w-32 bg-slate-800 border-none rounded-2xl px-3 md:px-6 h-12 md:h-14 text-[12px] md:text-sm text-white outline-none text-center"
+                              placeholder="Qtd"
+                            />
+                            <button onClick={addItemToOS} className="bg-blue-600 hover:bg-blue-500 flex-1 md:w-12 md:flex-none h-12 md:h-14 rounded-2xl flex items-center justify-center transition-all"><Plus size={20} className="md:w-[28px] md:h-[28px]"/></button>
+                          </div>
                         </>
                       )}
-                      <button onClick={addItemToOS} className="bg-blue-600 hover:bg-blue-500 w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center transition-all"><Plus size={20} className="md:w-[28px] md:h-[28px]"/></button>
                     </div>
 
                     {/* Lista de Itens */}
@@ -2866,6 +2842,16 @@ const App: React.FC = () => {
                         className="w-full bg-slate-50 border border-slate-200 rounded-3xl px-4 md:px-8 h-12 md:h-16 text-[13px] md:text-sm font-bold focus:ring-4 focus:ring-blue-100 outline-none shadow-sm"
                         value={newOS.descontoManual || ''}
                         onChange={e => setNewOS({...newOS, descontoManual: parseFloat(e.target.value) || 0})}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Observação (opcional)</label>
+                      <textarea 
+                        rows={3}
+                        placeholder="Digite observações sobre esta locação..."
+                        className="w-full bg-slate-50 border border-slate-200 rounded-3xl px-4 md:px-8 py-3 md:py-4 text-[13px] md:text-sm font-medium focus:ring-4 focus:ring-blue-100 outline-none shadow-sm resize-none"
+                        value={newOS.observacao || ''}
+                        onChange={e => setNewOS({...newOS, observacao: e.target.value})}
                       />
                     </div>
                     
