@@ -57,7 +57,14 @@ export const GoogleAuth: React.FC<GoogleAuthProps> = ({
           // Cria array e limpa espaços em branco
           const allowedEmails = allowedEmailsEnv.split(',').map((e: string) => e.trim().toLowerCase()).filter((e: string) => e.length > 0);
 
+          // 🔍 DEBUG: Logs detalhados para diagnóstico
+          console.log('🔍 DEBUG - Verificação de E-mail:');
+          console.log(`   - Variável VITE_ALLOWED_EMAILS:`, allowedEmailsEnv);
+          console.log(`   - Lista processada:`, allowedEmails);
+          console.log(`   - Total de e-mails permitidos:`, allowedEmails.length);
           console.log(`👤 Usuário tentando logar: ${userEmail}`);
+          console.log(`   - E-mail normalizado:`, userEmail.toLowerCase());
+          console.log(`   - E-mail está na lista?`, allowedEmails.includes(userEmail.toLowerCase()));
 
           // 3. Verificar se o email está na lista (Se a lista estiver vazia, bloqueia tudo por segurança)
           if (allowedEmails.length > 0 && allowedEmails.includes(userEmail.toLowerCase())) {
